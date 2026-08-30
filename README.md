@@ -2,6 +2,10 @@
 
 Ein Maven-/JavaFX-Desktop-Tool, das mehrere ICS-Kalender (iCalendar) aus dem Internet lädt, deren Termine filtert und sie sowohl in einer **Monatskalender-Ansicht** als auch in einer **sortierten Terminliste** anzeigt.
 
+## Download
+
+Die fertig gebaute, eigenständig lauffähige Windows-EXE findest du unter den [Releases](https://github.com/Xeratul/ics-filter/releases/latest).
+
 ## Voraussetzungen
 
 - JDK 21+ (getestet mit JDK 26, `release 26`)
@@ -21,6 +25,18 @@ Ein Maven-/JavaFX-Desktop-Tool, das mehrere ICS-Kalender (iCalendar) aus dem Int
 ./mvnw clean test
 ./mvnw compile
 ```
+
+## Ausführbare EXE bauen (ohne Installer, ohne WiX)
+
+Erzeugt mit jpackage einen eigenständigen, startbaren Ordner samt `.exe`:
+**kein Installer, kein WiX**.
+
+```bash
+./mvnw clean package -Papp-image
+```
+
+Ausgabe: `target/dist/ICS Filter/ICS Filter.exe` — der gesamte Ordner
+`target/dist/ICS Filter` muss beieinander bleiben.
 
 ## Starten
 

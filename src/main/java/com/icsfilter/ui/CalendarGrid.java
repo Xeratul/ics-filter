@@ -201,7 +201,7 @@ public final class CalendarGrid extends BorderPane {
             }
             root.getChildren().add(content);
             root.setPrefSize(Region.USE_COMPUTED_SIZE, CELL_H);
-            root.setMinSize(110, CELL_H);
+            root.setMinSize(46, CELL_H);
             root.setMaxSize(Double.MAX_VALUE, CELL_H);
             updateStyle();
         }

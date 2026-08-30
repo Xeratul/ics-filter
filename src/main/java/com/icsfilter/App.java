@@ -48,9 +48,13 @@ public final class App extends Application {
     private final Label titleLabel = new Label("ICS Filter");
 
     private List<CalendarEvent> allEvents = List.of();
+    private SplitPane center;
+    private SplitPane calendar;
+    private Stage stage;
 
     @Override
     public void start(Stage stage) {
+        this.stage = stage;
         BorderPane root = new BorderPane();
 
         VBox left = new VBox(6, sourceManager, new Separator(), filterPane);
@@ -60,11 +64,18 @@ public final class App extends Application {
 
         root.setLeft(leftScroll);
 
-        SplitPane center = new SplitPane(calendarGrid, detailPane);
-        center.setOrientation(Orientation.VERTICAL);
-        center.setDividerPositions(0.62);
+        calendar = new SplitPane(calendarGrid, detailPane);
+        calendar.setOrientation(Orientation.VERTICAL);
+        calendar.setDividerPositions(0.62);
+        // Let the calendar area squeeze so the event list can be widened.
+        calendar.setMinWidth(300);
+
+        // Calendar area (with detail pane) on the left, event list on the right;
+        // the divider between the two is draggable.
+        center = new SplitPane(calendar, eventList);
+        center.setOrientation(Orientation.HORIZONTAL);
+        center.setDividerPositions(0.7);
         root.setCenter(center);
-        root.setRight(eventList);
 
         BorderPane header = new BorderPane();
         titleLabel.setStyle("-fx-font-size: 20; -fx-font-weight: bold;");
@@ -87,10 +98,11 @@ public final class App extends Application {
         stage.setTitle("ICS Filter");
         stage.setScene(scene);
         stage.show();
+        stage.setOnCloseRequest(e -> persistAndRefresh());
         restore();
     }
 
-    /** Restores sources, enabled flags and filters saved on the last run. */
+    /** Restores sources, enabled flags, filters and the window layout. */
     private void restore() {
         ConfigStore.Data data = store.load();
         sourceManager.sources().setAll(data.sources());
@@ -101,7 +113,33 @@ public final class App extends Application {
         filterPane.to(data.to());
         filterPane.selectCategories(data.categories());
         sourceManager.refreshList();
+        restoreLayout(data.layout());
         refreshViews();
+    }
+
+    /** Applies the persisted split dividers, window geometry and column widths. */
+    private void restoreLayout(ConfigStore.Layout layout) {
+        center.setDividerPositions(layout.hDivider());
+        calendar.setDividerPositions(layout.vDivider());
+        if (!Double.isNaN(layout.windowX()) && !Double.isNaN(layout.windowY())) {
+            stage.setX(layout.windowX());
+            stage.setY(layout.windowY());
+        }
+        if (layout.windowWidth() > 0) {
+            stage.setWidth(layout.windowWidth());
+        }
+        if (layout.windowHeight() > 0) {
+            stage.setHeight(layout.windowHeight());
+        }
+        eventList.setColumnWidths(layout.columnWidths());
+    }
+
+    /** Captures the current split dividers, window geometry and column widths. */
+    private ConfigStore.Layout currentLayout() {
+        double h = center.getDividerPositions().length > 0 ? center.getDividerPositions()[0] : 0.7;
+        double v = calendar.getDividerPositions().length > 0 ? calendar.getDividerPositions()[0] : 0.62;
+        return new ConfigStore.Layout(h, v, stage.getX(), stage.getY(), stage.getWidth(), stage.getHeight(),
+                eventList.columnWidths());
     }
 
     /** Persists the current state, then updates both views. */
@@ -112,7 +150,8 @@ public final class App extends Application {
                 filterPane.keyword(),
                 filterPane.from(),
                 filterPane.to(),
-                new LinkedHashSet<>(filterPane.selectedCategories()));
+                new LinkedHashSet<>(filterPane.selectedCategories()),
+                currentLayout());
         store.save(data);
         refreshViews();
     }

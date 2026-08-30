@@ -30,6 +30,7 @@ public final class SourceManagerPane extends VBox {
 
     private final TextField nameField = new TextField();
     private final TextField urlField = new TextField();
+    private final TextField filterField = new TextField();
 
     private Runnable onReload = () -> { };
     private Runnable onSourcesChanged = () -> { };
@@ -56,6 +57,11 @@ public final class SourceManagerPane extends VBox {
         HBox.setHgrow(urlField, Priority.ALWAYS);
         addRow2.getChildren().add(urlField);
 
+        HBox addRow3 = new HBox(6);
+        filterField.setPromptText("Filter (im Titel)");
+        HBox.setHgrow(filterField, Priority.ALWAYS);
+        addRow3.getChildren().add(filterField);
+
         Button addButton = new Button("Hinzufügen");
         addButton.setMaxWidth(Double.MAX_VALUE);
         addButton.setOnAction(e -> addCurrent());
@@ -69,7 +75,7 @@ public final class SourceManagerPane extends VBox {
         reloadButton.setStyle("-fx-background-color: #2a9d8f; -fx-text-fill: white;");
         reloadButton.setOnAction(e -> onReload.run());
 
-        getChildren().addAll(addRow1, addRow2, addButton);
+        getChildren().addAll(addRow1, addRow2, addRow3, addButton);
         getChildren().add(new HBox(6, removeButton, reloadButton));
     }
 
@@ -89,16 +95,23 @@ public final class SourceManagerPane extends VBox {
         this.onSourcesChanged = onSourcesChanged;
     }
 
+    /** Forces the source list cells to repaint (e.g. after restoring state). */
+    public void refreshList() {
+        listView.refresh();
+    }
+
     private void addCurrent() {
         String name = nameField.getText().trim();
         String url = urlField.getText().trim();
+        String filter = filterField.getText().trim();
         if (name.isEmpty() || url.isEmpty()) {
             return;
         }
-        sources.add(new CalendarSource(name, url));
+        sources.add(new CalendarSource(name, url, filter));
         enabled.add(name);
         nameField.clear();
         urlField.clear();
+        filterField.clear();
         onSourcesChanged.run();
         listView.refresh();
     }
@@ -116,10 +129,12 @@ public final class SourceManagerPane extends VBox {
     private final class SourceCell extends ListCell<CalendarSource> {
         private final CheckBox checkBox = new CheckBox();
         private final Label nameLabel = new Label();
+        private final Label filterLabel = new Label();
+        private final VBox labelsBox = new VBox(0);
+        private final HBox box = new HBox(6);
         private CalendarSource item;
 
         SourceCell() {
-            HBox box = new HBox(6);
             box.setAlignment(Pos.CENTER_LEFT);
             checkBox.setOnAction(e -> {
                 if (item != null) {
@@ -131,7 +146,10 @@ public final class SourceManagerPane extends VBox {
                     onSourcesChanged.run();
                 }
             });
-            box.getChildren().addAll(checkBox, nameLabel);
+            nameLabel.setStyle("-fx-font-weight: bold;");
+            filterLabel.setStyle("-fx-font-size: 10; -fx-text-fill: #777;");
+            labelsBox.getChildren().addAll(nameLabel, filterLabel);
+            box.getChildren().addAll(checkBox, labelsBox);
             setGraphic(box);
         }
 
@@ -145,12 +163,13 @@ public final class SourceManagerPane extends VBox {
                 return;
             }
             setText(null);
-            setGraphic(getGraphic());
+            setGraphic(box);
             nameLabel.setText(source.name());
+            filterLabel.setText(source.filter().isBlank() ? "" : "enthält: " + source.filter());
             Color color = UiPalette.colorFor(indexOfSources(source));
+            nameLabel.setTextFill(Color.web("#222"));
             checkBox.setTextFill(color);
             checkBox.setSelected(enabled.contains(source.name()));
-            checkBox.setText("");
             setStyle("-fx-background-color: " + toCss(color.deriveColor(0, 1, 1, 0.25)) + ";");
         }
 

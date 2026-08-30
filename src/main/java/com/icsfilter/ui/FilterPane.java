@@ -85,6 +85,28 @@ public final class FilterPane extends VBox {
         return selectedCategories;
     }
 
+    /** Restores the keyword field (does not trigger a re-filter). */
+    public void keyword(String value) {
+        keywordField.setText(value);
+    }
+
+    /** Restores the "from" date (does not trigger a re-filter). */
+    public void from(LocalDate value) {
+        fromPicker.setValue(value);
+    }
+
+    /** Restores the "to" date (does not trigger a re-filter). */
+    public void to(LocalDate value) {
+        toPicker.setValue(value);
+    }
+
+    /** Restores the selected category names (does not trigger a re-filter). */
+    public void selectCategories(java.util.Collection<String> values) {
+        selectedCategories.clear();
+        selectedCategories.addAll(values);
+        categoryList.refresh();
+    }
+
     /** Refreshes the category check boxes from the currently loaded events. */
     public void setCategories(java.util.Collection<String> allCategories) {
         categories.setAll(new TreeSet<>(allCategories));

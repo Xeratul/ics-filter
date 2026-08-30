@@ -4,6 +4,7 @@ import com.icsfilter.filter.EventFilter;
 import com.icsfilter.ical.EventLoader;
 import com.icsfilter.model.CalendarEvent;
 import com.icsfilter.model.CalendarSource;
+import com.icsfilter.store.ConfigStore;
 import com.icsfilter.ui.CalendarGrid;
 import com.icsfilter.ui.EventListPane;
 import com.icsfilter.ui.FilterPane;
@@ -37,6 +38,7 @@ public final class App extends Application {
     private final FilterPane filterPane = new FilterPane();
     private final CalendarGrid calendarGrid = new CalendarGrid();
     private final EventListPane eventList = new EventListPane();
+    private final ConfigStore store = new ConfigStore();
 
     private final Label status = new Label("Bereit");
     private final Label titleLabel = new Label("ICS Filter");
@@ -64,8 +66,8 @@ public final class App extends Application {
         root.setTop(header);
 
         sourceManager.setOnReload(this::reload);
-        sourceManager.setOnSourcesChanged(this::refreshViews);
-        filterPane.setOnChange(this::refreshViews);
+        sourceManager.setOnSourcesChanged(this::persistAndRefresh);
+        filterPane.setOnChange(this::persistAndRefresh);
         calendarGrid.setOnDaySelected(d -> { });
         eventList.setOnEventSelected(e -> calendarGrid.setSelectedDate(e.startDate()));
 
@@ -73,6 +75,33 @@ public final class App extends Application {
         stage.setTitle("ICS Filter");
         stage.setScene(scene);
         stage.show();
+        restore();
+    }
+
+    /** Restores sources, enabled flags and filters saved on the last run. */
+    private void restore() {
+        ConfigStore.Data data = store.load();
+        sourceManager.sources().setAll(data.sources());
+        sourceManager.enabled().clear();
+        sourceManager.enabled().addAll(data.enabled());
+        filterPane.keyword(data.keyword());
+        filterPane.from(data.from());
+        filterPane.to(data.to());
+        filterPane.selectCategories(data.categories());
+        sourceManager.refreshList();
+        refreshViews();
+    }
+
+    /** Persists the current state, then updates both views. */
+    private void persistAndRefresh() {
+        ConfigStore.Data data = new ConfigStore.Data(
+                new ArrayList<>(sourceManager.sources()),
+                new LinkedHashSet<>(sourceManager.enabled()),
+                filterPane.keyword(),
+                filterPane.from(),
+                filterPane.to(),
+                new LinkedHashSet<>(filterPane.selectedCategories()));
+        store.save(data);
         refreshViews();
     }
 
@@ -123,6 +152,7 @@ public final class App extends Application {
 
         List<CalendarEvent> available = allEvents.stream()
                 .filter(e -> enabled.contains(e.source().name()))
+                .filter(App::matchesSourceFilter)
                 .toList();
 
         List<CalendarEvent> filtered = filter.apply(available);
@@ -143,6 +173,15 @@ public final class App extends Application {
         filter.to(filterPane.to());
         filter.categories().addAll(filterPane.selectedCategories());
         return filter;
+    }
+
+    /** Keeps only events whose summary contains their source's filter string. */
+    private static boolean matchesSourceFilter(CalendarEvent e) {
+        String filter = e.source().filterLower();
+        if (filter.isEmpty()) {
+            return true;
+        }
+        return e.summary().toLowerCase().contains(filter);
     }
 
     public static void main(String[] args) {

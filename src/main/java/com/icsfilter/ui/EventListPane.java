@@ -12,6 +12,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
@@ -48,6 +49,8 @@ public final class EventListPane extends VBox {
             }
         });
         dateCol.setPrefWidth(110);
+        dateCol.setComparator(Comparator.comparing(CalendarEvent::startDate,
+                Comparator.nullsLast(Comparator.naturalOrder())));
 
         TableColumn<CalendarEvent, CalendarEvent> timeCol = new TableColumn<>("Uhrzeit");
         timeCol.setCellValueFactory(d -> new javafx.beans.property.ReadOnlyObjectWrapper<>(d.getValue()));
@@ -63,6 +66,8 @@ public final class EventListPane extends VBox {
             }
         });
         timeCol.setPrefWidth(90);
+        timeCol.setComparator(Comparator.comparing(EventListPane::sortTime,
+                Comparator.nullsLast(Comparator.naturalOrder())));
 
         TableColumn<CalendarEvent, CalendarEvent> titleCol = new TableColumn<>("Titel");
         titleCol.setCellValueFactory(d -> new javafx.beans.property.ReadOnlyObjectWrapper<>(d.getValue()));
@@ -79,6 +84,8 @@ public final class EventListPane extends VBox {
             }
         });
         titleCol.setPrefWidth(200);
+        titleCol.setComparator(Comparator.comparing(CalendarEvent::summary,
+                Comparator.nullsLast(Comparator.naturalOrder())));
 
         TableColumn<CalendarEvent, CalendarEvent> sourceCol = new TableColumn<>("Quelle");
         sourceCol.setCellValueFactory(d -> new javafx.beans.property.ReadOnlyObjectWrapper<>(d.getValue()));
@@ -97,6 +104,8 @@ public final class EventListPane extends VBox {
             }
         });
         sourceCol.setPrefWidth(120);
+        sourceCol.setComparator(Comparator.comparing(e -> e.source() == null ? "" : e.source().name(),
+                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
 
         TableColumn<CalendarEvent, CalendarEvent> catCol = new TableColumn<>("Kategorie");
         catCol.setCellValueFactory(d -> new javafx.beans.property.ReadOnlyObjectWrapper<>(d.getValue()));
@@ -112,6 +121,8 @@ public final class EventListPane extends VBox {
             }
         });
         catCol.setPrefWidth(120);
+        catCol.setComparator(Comparator.comparing(CalendarEvent::category,
+                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
 
         table.getColumns().addAll(dateCol, timeCol, titleCol, sourceCol, catCol);
         table.setItems(items);
@@ -137,6 +148,14 @@ public final class EventListPane extends VBox {
                         : e.start().toLocalDateTime()));
         items.setAll(sorted);
         countLabel.setText(sorted.size() + " Termine");
+    }
+
+    /** Sorting key for the time column: all-day events sort first within a day. */
+    private static LocalTime sortTime(CalendarEvent event) {
+        if (event.allDay()) {
+            return LocalTime.MIN;
+        }
+        return event.start() == null ? LocalTime.MAX : event.start().toLocalTime();
     }
 
     private String formatDate(CalendarEvent event) {

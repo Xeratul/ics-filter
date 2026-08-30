@@ -53,9 +53,11 @@ public final class CalendarGrid extends BorderPane {
         next.setOnAction(e -> navigate(1));
         today.setOnAction(e -> goToToday());
         monthLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 16;");
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        toolbar.getChildren().addAll(prev, next, spacer, monthLabel, spacer, today);
+        Region spacerLeft = new Region();
+        HBox.setHgrow(spacerLeft, Priority.ALWAYS);
+        Region spacerRight = new Region();
+        HBox.setHgrow(spacerRight, Priority.ALWAYS);
+        toolbar.getChildren().addAll(prev, next, spacerLeft, monthLabel, spacerRight, today);
 
         grid.setHgap(3);
         grid.setVgap(3);

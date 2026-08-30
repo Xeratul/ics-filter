@@ -33,7 +33,23 @@ public final class ConfigStore {
 
     /** All persisted application state. */
     public record Data(List<CalendarSource> sources, Set<String> enabled,
-                       String keyword, LocalDate from, LocalDate to, Set<String> categories) {
+                       String keyword, LocalDate from, LocalDate to, Set<String> categories,
+                       Layout layout) {
+
+        public Data(List<CalendarSource> sources, Set<String> enabled,
+                    String keyword, LocalDate from, LocalDate to, Set<String> categories) {
+            this(sources, enabled, keyword, from, to, categories, new Layout());
+        }
+    }
+
+    /** Persisted window layout: split dividers, window geometry and column widths. */
+    public record Layout(double hDivider, double vDivider,
+                         double windowX, double windowY, double windowWidth, double windowHeight,
+                         List<Double> columnWidths) {
+
+        public Layout() {
+            this(0.7, 0.62, Double.NaN, Double.NaN, 1180, 740, List.of());
+        }
     }
 
     public Data load() {
@@ -75,7 +91,22 @@ public final class ConfigStore {
         if (!catProp.isBlank()) {
             categories.addAll(List.of(catProp.split(",")));
         }
-        return new Data(sources, enabled, keyword, from, to, categories);
+
+        double hDivider = doubleProp(p, "layout.hDivider", 0.7);
+        double vDivider = doubleProp(p, "layout.vDivider", 0.62);
+        double windowX = doubleProp(p, "layout.windowX", Double.NaN);
+        double windowY = doubleProp(p, "layout.windowY", Double.NaN);
+        double windowWidth = doubleProp(p, "layout.windowWidth", 1180);
+        double windowHeight = doubleProp(p, "layout.windowHeight", 740);
+        List<Double> columnWidths = new ArrayList<>();
+        int colCount = intProp(p, "layout.columns.count", 0);
+        for (int i = 0; i < colCount; i++) {
+            columnWidths.add(doubleProp(p, "layout.columns." + i, 0.0));
+        }
+        Layout layout = new Layout(hDivider, vDivider, windowX, windowY,
+                windowWidth, windowHeight, columnWidths);
+
+        return new Data(sources, enabled, keyword, from, to, categories, layout);
     }
 
     public void save(Data data) {
@@ -103,6 +134,19 @@ public final class ConfigStore {
             p.setProperty("filter.to", data.to() == null ? "" : data.to().toString());
             p.setProperty("filter.categories", String.join(",", data.categories()));
 
+            Layout layout = data.layout();
+            p.setProperty("layout.hDivider", String.valueOf(layout.hDivider()));
+            p.setProperty("layout.vDivider", String.valueOf(layout.vDivider()));
+            p.setProperty("layout.windowX", String.valueOf(layout.windowX()));
+            p.setProperty("layout.windowY", String.valueOf(layout.windowY()));
+            p.setProperty("layout.windowWidth", String.valueOf(layout.windowWidth()));
+            p.setProperty("layout.windowHeight", String.valueOf(layout.windowHeight()));
+            List<Double> widths = layout.columnWidths();
+            p.setProperty("layout.columns.count", String.valueOf(widths.size()));
+            for (int i = 0; i < widths.size(); i++) {
+                p.setProperty("layout.columns." + i, String.valueOf(widths.get(i)));
+            }
+
             try (Writer w = Files.newBufferedWriter(file)) {
                 p.store(w, "ICS Filter configuration");
             }
@@ -114,6 +158,14 @@ public final class ConfigStore {
     private static int intProp(Properties p, String key, int fallback) {
         try {
             return Integer.parseInt(p.getProperty(key, String.valueOf(fallback)).trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private static double doubleProp(Properties p, String key, double fallback) {
+        try {
+            return Double.parseDouble(p.getProperty(key, String.valueOf(fallback)).trim());
         } catch (NumberFormatException e) {
             return fallback;
         }

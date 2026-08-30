@@ -44,6 +44,25 @@ class ConfigStoreTest {
     }
 
     @Test
+    void roundTripsLayout(@TempDir Path dir) {
+        Path file = dir.resolve("layout.properties");
+        ConfigStore store = new ConfigStore(file);
+        List<Double> widths = List.of(110.0, 90.0, 200.0, 120.0, 120.0);
+        ConfigStore.Layout layout = new ConfigStore.Layout(0.8, 0.4, 100.0, 50.0, 1200.0, 800.0, widths);
+        store.save(new ConfigStore.Data(List.of(), new LinkedHashSet<>(), "", null, null,
+                new LinkedHashSet<>(), layout));
+
+        ConfigStore.Layout loaded = store.load().layout();
+        assertEquals(0.8, loaded.hDivider());
+        assertEquals(0.4, loaded.vDivider());
+        assertEquals(100.0, loaded.windowX());
+        assertEquals(50.0, loaded.windowY());
+        assertEquals(1200.0, loaded.windowWidth());
+        assertEquals(800.0, loaded.windowHeight());
+        assertEquals(widths, loaded.columnWidths());
+    }
+
+    @Test
     void loadReturnsDefaultsWhenFileMissing(@TempDir Path dir) {
         Path file = dir.resolve("does-not-exist.properties");
         ConfigStore store = new ConfigStore(file);

@@ -79,7 +79,7 @@ public final class EventListPane extends VBox {
                     setText(null);
                     return;
                 }
-                setText(event.summary());
+                setText(stripParentheses(event.summary()));
                 setTooltip(new javafx.scene.control.Tooltip(event.summary()));
             }
         });
@@ -107,9 +107,9 @@ public final class EventListPane extends VBox {
         sourceCol.setComparator(Comparator.comparing(e -> e.source() == null ? "" : e.source().name(),
                 Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
 
-        TableColumn<CalendarEvent, CalendarEvent> catCol = new TableColumn<>("Kategorie");
-        catCol.setCellValueFactory(d -> new javafx.beans.property.ReadOnlyObjectWrapper<>(d.getValue()));
-        catCol.setCellFactory(c -> new TableCell<>() {
+        TableColumn<CalendarEvent, CalendarEvent> locationCol = new TableColumn<>("Ort");
+        locationCol.setCellValueFactory(d -> new javafx.beans.property.ReadOnlyObjectWrapper<>(d.getValue()));
+        locationCol.setCellFactory(c -> new TableCell<>() {
             @Override
             protected void updateItem(CalendarEvent event, boolean empty) {
                 super.updateItem(event, empty);
@@ -117,14 +117,14 @@ public final class EventListPane extends VBox {
                     setText(null);
                     return;
                 }
-                setText(event.category() == null ? "" : event.category());
+                setText(event.location());
             }
         });
-        catCol.setPrefWidth(120);
-        catCol.setComparator(Comparator.comparing(CalendarEvent::category,
+        locationCol.setPrefWidth(120);
+        locationCol.setComparator(Comparator.comparing(CalendarEvent::location,
                 Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
 
-        table.getColumns().addAll(dateCol, timeCol, titleCol, sourceCol, catCol);
+        table.getColumns().addAll(dateCol, timeCol, titleCol, sourceCol, locationCol);
         table.setItems(items);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         VBox.setVgrow(table, Priority.ALWAYS);
@@ -139,6 +139,28 @@ public final class EventListPane extends VBox {
                         onEventSelected.accept(n);
                     }
                 });
+    }
+
+    /** Snapshot of the current column widths, in column order. */
+    public List<Double> columnWidths() {
+        List<Double> widths = new java.util.ArrayList<>();
+        for (TableColumn<CalendarEvent, ?> col : table.getColumns()) {
+            widths.add(col.getWidth());
+        }
+        return widths;
+    }
+
+    /** Restores saved column widths; ignored when the size does not match. */
+    public void setColumnWidths(List<Double> widths) {
+        if (widths == null || widths.size() != table.getColumns().size()) {
+            return;
+        }
+        for (int i = 0; i < table.getColumns().size(); i++) {
+            Double w = widths.get(i);
+            if (w != null && w > 0) {
+                table.getColumns().get(i).setPrefWidth(w);
+            }
+        }
     }
 
     public void setEvents(List<CalendarEvent> events) {
@@ -177,5 +199,13 @@ public final class EventListPane extends VBox {
                 (int) Math.round(color.getRed() * 255),
                 (int) Math.round(color.getGreen() * 255),
                 (int) Math.round(color.getBlue() * 255));
+    }
+
+    /** Removes parenthesised fragments, e.g. "Meeting (Sitzung)" -> "Meeting". */
+    private static String stripParentheses(String s) {
+        if (s == null || s.isBlank()) {
+            return s == null ? "" : s;
+        }
+        return s.replaceAll("\\([^)]*\\)", "").replaceAll("\\s{2,}", " ").trim();
     }
 }

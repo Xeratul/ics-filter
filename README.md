@@ -2,12 +2,11 @@
 
 Ein Maven-/JavaFX-Desktop-Tool, das mehrere ICS-Kalender (iCalendar) aus dem Internet lädt, deren Termine filtert und sie sowohl in einer **Monatskalender-Ansicht** als auch in einer **sortierten Terminliste** anzeigt.
 
-<img width="1920" height="1153" alt="image" src="https://github.com/user-attachments/assets/89ace7c7-061d-40e4-b009-7cd30f44926d" />
-
-
 ## Download
 
 Die fertig gebaute, eigenständig lauffähige Windows-EXE findest du unter den [Releases](https://github.com/Xeratul/ics-filter/releases/latest).
+
+<img width="1920" height="1153" alt="image" src="https://github.com/user-attachments/assets/89ace7c7-061d-40e4-b009-7cd30f44926d" />
 
 ## Voraussetzungen
 

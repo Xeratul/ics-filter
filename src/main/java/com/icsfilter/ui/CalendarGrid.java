@@ -40,6 +40,7 @@ public final class CalendarGrid extends BorderPane {
     private LocalDate selected = LocalDate.now();
     private List<CalendarEvent> events = List.of();
     private Consumer<LocalDate> onDaySelected = d -> { };
+    private Consumer<CalendarEvent> onEventSelected = e -> { };
 
     public CalendarGrid() {
         setPadding(new Insets(8));
@@ -68,6 +69,10 @@ public final class CalendarGrid extends BorderPane {
 
     public void setOnDaySelected(Consumer<LocalDate> onDaySelected) {
         this.onDaySelected = onDaySelected;
+    }
+
+    public void setOnEventSelected(Consumer<CalendarEvent> onEventSelected) {
+        this.onEventSelected = onEventSelected;
     }
 
     public void setEvents(List<CalendarEvent> events) {
@@ -190,6 +195,7 @@ public final class CalendarGrid extends BorderPane {
                 chip.setStyle("-fx-background-color: " + toCss(c) + "; -fx-text-fill: white; "
                         + "-fx-font-size: 9; -fx-padding: 1 4 1 4; -fx-background-radius: 4;");
                 chip.setMaxWidth(Double.MAX_VALUE);
+                chip.setOnMouseClicked(ev -> onEventSelected.accept(e));
                 content.getChildren().add(chip);
                 shown++;
             }

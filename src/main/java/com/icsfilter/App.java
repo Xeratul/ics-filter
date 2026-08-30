@@ -6,15 +6,18 @@ import com.icsfilter.model.CalendarEvent;
 import com.icsfilter.model.CalendarSource;
 import com.icsfilter.store.ConfigStore;
 import com.icsfilter.ui.CalendarGrid;
+import com.icsfilter.ui.EventDetailPane;
 import com.icsfilter.ui.EventListPane;
 import com.icsfilter.ui.FilterPane;
 import com.icsfilter.ui.SourceManagerPane;
 import javafx.application.Application;
 import javafx.concurrent.Task;
+import javafx.geometry.Orientation;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
+import javafx.scene.control.SplitPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -38,6 +41,7 @@ public final class App extends Application {
     private final FilterPane filterPane = new FilterPane();
     private final CalendarGrid calendarGrid = new CalendarGrid();
     private final EventListPane eventList = new EventListPane();
+    private final EventDetailPane detailPane = new EventDetailPane();
     private final ConfigStore store = new ConfigStore();
 
     private final Label status = new Label("Bereit");
@@ -55,7 +59,11 @@ public final class App extends Application {
         leftScroll.setPrefWidth(340);
 
         root.setLeft(leftScroll);
-        root.setCenter(calendarGrid);
+
+        SplitPane center = new SplitPane(calendarGrid, detailPane);
+        center.setOrientation(Orientation.VERTICAL);
+        center.setDividerPositions(0.62);
+        root.setCenter(center);
         root.setRight(eventList);
 
         BorderPane header = new BorderPane();
@@ -69,7 +77,11 @@ public final class App extends Application {
         sourceManager.setOnSourcesChanged(this::persistAndRefresh);
         filterPane.setOnChange(this::persistAndRefresh);
         calendarGrid.setOnDaySelected(d -> { });
-        eventList.setOnEventSelected(e -> calendarGrid.setSelectedDate(e.startDate()));
+        calendarGrid.setOnEventSelected(detailPane::setEvent);
+        eventList.setOnEventSelected(e -> {
+            calendarGrid.setSelectedDate(e.startDate());
+            detailPane.setEvent(e);
+        });
 
         Scene scene = new Scene(root, 1180, 740);
         stage.setTitle("ICS Filter");

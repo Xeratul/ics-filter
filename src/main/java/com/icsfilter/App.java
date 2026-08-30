@@ -1,0 +1,151 @@
+package com.icsfilter;
+
+import com.icsfilter.filter.EventFilter;
+import com.icsfilter.ical.EventLoader;
+import com.icsfilter.model.CalendarEvent;
+import com.icsfilter.model.CalendarSource;
+import com.icsfilter.ui.CalendarGrid;
+import com.icsfilter.ui.EventListPane;
+import com.icsfilter.ui.FilterPane;
+import com.icsfilter.ui.SourceManagerPane;
+import javafx.application.Application;
+import javafx.concurrent.Task;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Separator;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * JavaFX application: manages ICS sources, loads and filters their events, and
+ * shows them in a month calendar plus a sorted event list.
+ */
+public final class App extends Application {
+
+    private final EventLoader loader = new EventLoader();
+    private final SourceManagerPane sourceManager = new SourceManagerPane();
+    private final FilterPane filterPane = new FilterPane();
+    private final CalendarGrid calendarGrid = new CalendarGrid();
+    private final EventListPane eventList = new EventListPane();
+
+    private final Label status = new Label("Bereit");
+    private final Label titleLabel = new Label("ICS Filter");
+
+    private List<CalendarEvent> allEvents = List.of();
+
+    @Override
+    public void start(Stage stage) {
+        BorderPane root = new BorderPane();
+
+        VBox left = new VBox(6, sourceManager, new Separator(), filterPane);
+        ScrollPane leftScroll = new ScrollPane(left);
+        leftScroll.setFitToWidth(true);
+        leftScroll.setPrefWidth(340);
+
+        root.setLeft(leftScroll);
+        root.setCenter(calendarGrid);
+        root.setRight(eventList);
+
+        BorderPane header = new BorderPane();
+        titleLabel.setStyle("-fx-font-size: 20; -fx-font-weight: bold;");
+        header.setLeft(titleLabel);
+        status.setStyle("-fx-text-fill: #666;");
+        header.setRight(status);
+        root.setTop(header);
+
+        sourceManager.setOnReload(this::reload);
+        sourceManager.setOnSourcesChanged(this::refreshViews);
+        filterPane.setOnChange(this::refreshViews);
+        calendarGrid.setOnDaySelected(d -> { });
+        eventList.setOnEventSelected(e -> calendarGrid.setSelectedDate(e.startDate()));
+
+        Scene scene = new Scene(root, 1180, 740);
+        stage.setTitle("ICS Filter");
+        stage.setScene(scene);
+        stage.show();
+        refreshViews();
+    }
+
+    /** Downloads and parses all enabled sources in a background task. */
+    private void reload() {
+        List<CalendarSource> sources = new ArrayList<>(sourceManager.sources());
+        Set<String> enabled = new LinkedHashSet<>(sourceManager.enabled());
+        List<CalendarSource> toLoad = sources.stream()
+                .filter(s -> enabled.contains(s.name()))
+                .toList();
+
+        if (toLoad.isEmpty()) {
+            allEvents = List.of();
+            status.setText("Keine Quellen");
+            refreshViews();
+            return;
+        }
+
+        status.setText("Lade " + toLoad.size() + " Quelle(n) ...");
+        ZonedDateTime now = ZonedDateTime.now();
+        ZonedDateTime winStart = now.minusYears(1);
+        ZonedDateTime winEnd = now.plusYears(2);
+
+        Task<List<CalendarEvent>> task = new Task<>() {
+            @Override
+            protected List<CalendarEvent> call() {
+                return loader.loadAll(toLoad, winStart, winEnd);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            allEvents = task.getValue();
+            status.setText("Geladen: " + allEvents.size() + " Termine");
+            refreshViews();
+        });
+        task.setOnFailed(e -> {
+            status.setText("Fehler beim Laden");
+            task.getException().printStackTrace();
+        });
+        Thread t = new Thread(task);
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** Recomputes the filtered events and updates both views. */
+    private void refreshViews() {
+        EventFilter filter = buildFilter();
+        Set<String> enabled = sourceManager.enabled();
+
+        List<CalendarEvent> available = allEvents.stream()
+                .filter(e -> enabled.contains(e.source().name()))
+                .toList();
+
+        List<CalendarEvent> filtered = filter.apply(available);
+        calendarGrid.setEvents(filtered);
+        eventList.setEvents(filtered);
+
+        Set<String> categories = allEvents.stream()
+                .map(CalendarEvent::category)
+                .filter(c -> c != null && !c.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        filterPane.setCategories(categories);
+    }
+
+    private EventFilter buildFilter() {
+        EventFilter filter = new EventFilter();
+        filter.keyword(filterPane.keyword());
+        filter.from(filterPane.from());
+        filter.to(filterPane.to());
+        filter.categories().addAll(filterPane.selectedCategories());
+        return filter;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}

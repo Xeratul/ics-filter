@@ -116,8 +116,12 @@ public final class EventLoader {
         String uid = Objects.requireNonNullElse(text(event, Property.UID), "no-uid");
         String category = firstCategory(event);
 
+        // Recurring multi-day events are not expanded: the day-by-day expansion
+        // of a multi-day occurrence would produce overlapping/incomplete entries.
+        boolean multiDay = end != null && !end.date.toLocalDate().equals(start.date.toLocalDate());
+
         Property rruleProp = event.getProperty(Property.RRULE);
-        if (rruleProp != null && !start.multiDay) {
+        if (rruleProp != null && !multiDay) {
             try {
                 Recurrence recurrence = Recurrence.parse(rruleProp.getValue());
                 for (ZonedDateTime occ : recurrence.occurrences(start.date, winStart, winEnd)) {
@@ -159,7 +163,7 @@ public final class EventLoader {
     }
 
     /** Parsed date/time plus a flag for all-day (DATE value) events. */
-    private record ParsedDate(ZonedDateTime date, boolean allDay, boolean multiDay) {
+    private record ParsedDate(ZonedDateTime date, boolean allDay) {
     }
 
     private ParsedDate parseDateProperty(Property property) {
@@ -172,20 +176,20 @@ public final class EventLoader {
         }
         if (value.length() == 8) {
             LocalDate day = LocalDate.parse(value, FMT_DATE);
-            return new ParsedDate(day.atStartOfDay(ZoneId.systemDefault()), true, false);
+            return new ParsedDate(day.atStartOfDay(ZoneId.systemDefault()), true);
         }
         Instant instant = parseDateTime(value, resolveZone(dateProp));
         if (instant == null) {
             return null;
         }
         ZonedDateTime zdt = ZonedDateTime.ofInstant(instant, ZoneId.systemDefault());
-        return new ParsedDate(zdt, false, false);
+        return new ParsedDate(zdt, false);
     }
 
     private Instant parseDateTime(String value, ZoneId zone) {
         try {
             if (value.endsWith("Z") || value.endsWith("z")) {
-                String stripped = value.endsWith("Z") ? value.substring(0, value.length() - 1) : value;
+                String stripped = value.substring(0, value.length() - 1);
                 return LocalDateTime.parse(stripped, FMT_DATETIME).toInstant(ZoneOffset.UTC);
             }
             LocalDateTime ldt = LocalDateTime.parse(value, FMT_DATETIME);

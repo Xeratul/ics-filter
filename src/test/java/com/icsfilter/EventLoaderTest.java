@@ -54,6 +54,60 @@ class EventLoaderTest {
         assertEquals("Meetings", filterCategory(events));
     }
 
+    @Test
+    void parsesLowercaseUtcZ() throws Exception {
+        String ics = """
+                BEGIN:VCALENDAR
+                VERSION:2.0
+                PRODID:-//test//ics-filter//EN
+                BEGIN:VEVENT
+                UID:lower-z
+                DTSTAMP:20240101T000000Z
+                DTSTART:20240102T090000z
+                DTEND:20240102T100000z
+                SUMMARY:Lowercase z
+                END:VEVENT
+                END:VCALENDAR
+                """;
+        CalendarSource source = new CalendarSource("Test", "https://example.com/test.ics");
+        EventLoader loader = new EventLoader();
+        ZonedDateTime winStart = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZONE);
+        ZonedDateTime winEnd = ZonedDateTime.of(2024, 12, 1, 0, 0, 0, 0, ZONE);
+
+        List<CalendarEvent> events = loader.parse(ics, source, winStart, winEnd);
+
+        assertEquals(1, events.size());
+        assertEquals("Lowercase z", events.get(0).summary());
+        assertEquals(java.time.LocalDate.of(2024, 1, 2), events.get(0).startDate());
+    }
+
+    @Test
+    void doesNotExpandRecurringMultiDayEvent() throws Exception {
+        String ics = """
+                BEGIN:VCALENDAR
+                VERSION:2.0
+                PRODID:-//test//ics-filter//EN
+                BEGIN:VEVENT
+                UID:multi-rec
+                DTSTAMP:20240101T000000Z
+                DTSTART:20240110T100000Z
+                DTEND:20240112T100000Z
+                RRULE:FREQ=DAILY;COUNT=3
+                SUMMARY:Multi-day recurring
+                END:VEVENT
+                END:VCALENDAR
+                """;
+        CalendarSource source = new CalendarSource("Test", "https://example.com/test.ics");
+        EventLoader loader = new EventLoader();
+        ZonedDateTime winStart = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZONE);
+        ZonedDateTime winEnd = ZonedDateTime.of(2024, 12, 1, 0, 0, 0, 0, ZONE);
+
+        List<CalendarEvent> events = loader.parse(ics, source, winStart, winEnd);
+
+        // A multi-day event is not day-by-day expanded even with an RRULE.
+        assertEquals(1, events.size());
+    }
+
     private String filterCategory(List<CalendarEvent> events) {
         for (CalendarEvent e : events) {
             if (e.category() != null && !e.category().isBlank()) {

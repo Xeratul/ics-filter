@@ -1,6 +1,7 @@
 package com.icsfilter.ui;
 
 import com.icsfilter.model.CalendarEvent;
+import com.icsfilter.model.CalendarSource;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -39,6 +40,7 @@ public final class CalendarGrid extends BorderPane {
     private YearMonth month = YearMonth.now();
     private LocalDate selected = LocalDate.now();
     private List<CalendarEvent> events = List.of();
+    private List<CalendarSource> sourceOrder = List.of();
     private Consumer<LocalDate> onDaySelected = d -> { };
     private Consumer<CalendarEvent> onEventSelected = e -> { };
 
@@ -80,6 +82,11 @@ public final class CalendarGrid extends BorderPane {
         rebuild();
     }
 
+    /** Sets the canonical source order used to resolve stable palette colours. */
+    public void setSourceOrder(List<CalendarSource> sourceOrder) {
+        this.sourceOrder = sourceOrder == null ? List.of() : sourceOrder;
+    }
+
     public void setSelectedDate(LocalDate date) {
         if (date == null) {
             return;
@@ -107,8 +114,14 @@ public final class CalendarGrid extends BorderPane {
     private Map<String, Color> sourceColors() {
         Map<String, Color> colors = new LinkedHashMap<>();
         for (CalendarEvent event : events) {
-            if (!colors.containsKey(event.source().name())) {
-                colors.put(event.source().name(), UiPalette.resolveColor(event.source(), colors.size()));
+            if (event.source() == null) {
+                continue;
+            }
+            String name = event.source().name();
+            if (!colors.containsKey(name)) {
+                CalendarSource current = UiPalette.currentSource(event.source(), sourceOrder);
+                int idx = current == null ? -1 : sourceOrder.indexOf(current);
+                colors.put(name, UiPalette.resolveColor(current, idx < 0 ? colors.size() : idx));
             }
         }
         return colors;

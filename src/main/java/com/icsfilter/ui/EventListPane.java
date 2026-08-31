@@ -1,6 +1,7 @@
 package com.icsfilter.ui;
 
 import com.icsfilter.model.CalendarEvent;
+import com.icsfilter.model.CalendarSource;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -29,6 +30,7 @@ public final class EventListPane extends VBox {
     private final Label countLabel = new Label();
     private final TableView<CalendarEvent> table = new TableView<>();
     private final ObservableList<CalendarEvent> items = FXCollections.observableArrayList();
+    private List<CalendarSource> sourceOrder = List.of();
 
     public EventListPane() {
         setSpacing(6);
@@ -98,8 +100,9 @@ public final class EventListPane extends VBox {
                     return;
                 }
                 setText(event.source().name());
-                int idx = items.indexOf(event);
-                Color color = UiPalette.resolveColor(event.source(), idx < 0 ? 0 : idx);
+                CalendarSource current = UiPalette.currentSource(event.source(), sourceOrder);
+                int idx = current == null ? -1 : sourceOrder.indexOf(current);
+                Color color = current == null ? Color.web("#999") : UiPalette.resolveColor(current, idx < 0 ? 0 : idx);
                 setStyle("-fx-text-fill: " + toCss(color) + ";");
             }
         });
@@ -161,6 +164,11 @@ public final class EventListPane extends VBox {
                 table.getColumns().get(i).setPrefWidth(w);
             }
         }
+    }
+
+    /** Sets the canonical source order used to resolve stable source colours. */
+    public void setSourceOrder(List<CalendarSource> sourceOrder) {
+        this.sourceOrder = sourceOrder == null ? List.of() : sourceOrder;
     }
 
     public void setEvents(List<CalendarEvent> events) {

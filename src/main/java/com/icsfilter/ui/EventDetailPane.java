@@ -1,6 +1,7 @@
 package com.icsfilter.ui;
 
 import com.icsfilter.model.CalendarEvent;
+import com.icsfilter.model.CalendarSource;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Hyperlink;
@@ -16,6 +17,7 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,6 +42,7 @@ public final class EventDetailPane extends ScrollPane {
     private final Label placeholder = new Label("Kein Termin ausgewählt");
     private final VBox details = new VBox();
     private final StackPane root = new StackPane();
+    private List<CalendarSource> sourceOrder = List.of();
 
     public EventDetailPane() {
         setFitToWidth(true);
@@ -82,6 +85,11 @@ public final class EventDetailPane extends ScrollPane {
         setEvent(null);
     }
 
+    /** Sets the canonical source order used to resolve stable source colours. */
+    public void setSourceOrder(List<CalendarSource> sourceOrder) {
+        this.sourceOrder = sourceOrder == null ? List.of() : sourceOrder;
+    }
+
     /** Displays the given event, or a placeholder when {@code event} is null. */
     public void setEvent(CalendarEvent event) {
         if (event == null) {
@@ -99,8 +107,9 @@ public final class EventDetailPane extends ScrollPane {
             sourceValue.setStyle("");
         } else {
             sourceValue.setText(event.source().name());
-            int idx = 0;
-            Color color = UiPalette.resolveColor(event.source(), idx);
+            CalendarSource current = UiPalette.currentSource(event.source(), sourceOrder);
+            int idx = current == null ? -1 : sourceOrder.indexOf(current);
+            Color color = current == null ? Color.web("#999") : UiPalette.resolveColor(current, idx < 0 ? 0 : idx);
             sourceValue.setStyle("-fx-text-fill: " + toCss(color) + ";");
         }
         setFlow(locationValue, event.location());
@@ -166,7 +175,9 @@ public final class EventDetailPane extends ScrollPane {
 
     private void openUrl(String url) {
         try {
-            java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
+            if (java.awt.Desktop.isDesktopSupported()) {
+                java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
+            }
         } catch (Exception ex) {
             System.err.println("Could not open " + url + ": " + ex.getMessage());
         }

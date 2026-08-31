@@ -6,7 +6,8 @@ Ein Maven-/JavaFX-Desktop-Tool, das mehrere ICS-Kalender (iCalendar) aus dem Int
 
 Die fertig gebaute, eigenständig lauffähige Windows-EXE findest du unter den [Releases](https://github.com/Xeratul/ics-filter/releases/latest).
 
-<img width="1679" height="996" alt="image" src="https://github.com/user-attachments/assets/2627066d-94a8-4432-958f-6b847327c1e8" />
+<img width="1679" height="996" alt="image" src="https://github.com/user-attachments/assets/faf7de7f-b63f-422e-82bf-cba3e6ba7aa5" />
+
 
 
 ## Voraussetzungen

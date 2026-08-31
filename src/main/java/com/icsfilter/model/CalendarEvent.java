@@ -1,6 +1,7 @@
 package com.icsfilter.model;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 /**
@@ -55,7 +56,30 @@ public final class CalendarEvent {
         return start == null ? null : start.toLocalDate();
     }
 
+    /**
+     * The last calendar day (inclusive) on which this event appears (system zone).
+     * <p>
+     * All-day events use an exclusive {@code DTEND} in iCalendar, so an event ending
+     * on day {@code X} actually occupies day {@code X-1} as its final day. Timed
+     * events also skip their nominal end day when they end exactly at midnight.
+     */
+    public LocalDate lastDay() {
+        if (start == null) {
+            return null;
+        }
+        if (end == null) {
+            return start.toLocalDate();
+        }
+        LocalDate endDay = end.toLocalDate();
+        boolean coversEndDay = !end.isEqual(endDay.atStartOfDay(ZoneId.systemDefault()));
+        LocalDate last = coversEndDay ? endDay : endDay.minusDays(1);
+        LocalDate first = start.toLocalDate();
+        return last.isBefore(first) ? first : last;
+    }
+
     public boolean isMultiDay() {
-        return start != null && end != null && !end.toLocalDate().equals(start.toLocalDate());
+        LocalDate first = startDate();
+        LocalDate last = lastDay();
+        return first != null && last != null && last.isAfter(first);
     }
 }

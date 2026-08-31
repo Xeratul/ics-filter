@@ -127,12 +127,17 @@ public final class CalendarGrid extends BorderPane {
         return colors;
     }
 
-    /** Groups events by the calendar day they start on. */
+    /** Groups events by every calendar day they occupy, so multi-day events span their whole range. */
     private Map<LocalDate, List<CalendarEvent>> byDay() {
         Map<LocalDate, List<CalendarEvent>> map = new LinkedHashMap<>();
         for (CalendarEvent event : events) {
-            if (event.startDate() != null) {
-                map.computeIfAbsent(event.startDate(), k -> new ArrayList<>()).add(event);
+            LocalDate first = event.startDate();
+            if (first == null) {
+                continue;
+            }
+            LocalDate last = event.lastDay() == null ? first : event.lastDay();
+            for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
+                map.computeIfAbsent(day, k -> new ArrayList<>()).add(event);
             }
         }
         return map;

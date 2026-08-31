@@ -20,6 +20,11 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.input.TransferMode;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 
@@ -32,7 +37,8 @@ import java.util.Set;
  * Shows the calendar sources as horizontal tiles in a top bar. Sources are
  * toggled on/off by clicking a tile, edited via the small corner button and
  * added through the trailing "+ neue Quelle" tile. Adding and editing happens
- * in a dialog.
+ * in a dialog. A tile can be dragged onto another position to reorder the
+ * sources; the new order is persisted as the canonical source order.
  */
 public final class SourceTilesBar extends VBox {
 
@@ -41,6 +47,13 @@ public final class SourceTilesBar extends VBox {
 
     private final HBox tilesBox = new HBox(10);
     private Runnable onSourcesChanged = () -> { };
+
+    private CalendarSource dragging;          // source currently dragged
+    private StackPane addTileNode;            // trailing "+ neue Quelle" tile
+    private Region indicator;                 // vertical insertion bar while dragging
+    private Node draggedTile;                 // tile being dragged (for styling)
+    private double draggedOriginalOpacity = 1.0;
+    private int dropIndex = -1;
 
     public SourceTilesBar() {
         setPadding(new Insets(8));
@@ -54,6 +67,7 @@ public final class SourceTilesBar extends VBox {
         scroll.setStyle("-fx-background-color: transparent; -fx-padding: 0;"); 
         getChildren().add(scroll);
 
+        installDropHandlers();
         rebuild();
     }
 
@@ -79,11 +93,15 @@ public final class SourceTilesBar extends VBox {
     // ------------------------------------------------------------------
 
     private void rebuild() {
+        dragging = null;
+        draggedTile = null;
+        removeIndicator();
         tilesBox.getChildren().clear();
         for (int i = 0; i < sources.size(); i++) {
             tilesBox.getChildren().add(sourceTile(sources.get(i)));
         }
-        tilesBox.getChildren().add(addTile());
+        addTileNode = addTile();
+        tilesBox.getChildren().add(addTileNode);
     }
 
     private StackPane sourceTile(CalendarSource source) {
@@ -125,6 +143,8 @@ public final class SourceTilesBar extends VBox {
         tile.setPrefHeight(82);
         tile.setMinHeight(70);
         tile.setOnMouseClicked(e -> toggle(source));
+        tile.setOnDragDetected(e -> beginDrag(tile, source, e));
+        tile.setOnDragDone(e -> endDrag(tile));
         applyTileStyle(tile, color, on);
         return tile;
     }
@@ -156,6 +176,127 @@ public final class SourceTilesBar extends VBox {
             tile.setStyle("-fx-background-color: #efefef; -fx-border-color: #c8c8c8; "
                     + "-fx-border-width: 2; -fx-background-radius: 8; -fx-border-radius: 8;");
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Drag-and-drop reordering
+    // ------------------------------------------------------------------
+
+    /** Wires drag-and-drop handlers on the tiles box to reorder the sources. */
+    private void installDropHandlers() {
+        tilesBox.setOnDragOver(e -> {
+            if (dragging == null) {
+                return;
+            }
+            e.acceptTransferModes(TransferMode.MOVE);
+            placeIndicator(computeDropIndex(e.getSceneX()));
+        });
+        tilesBox.setOnDragExited(e -> removeIndicator());
+        tilesBox.setOnDragDropped(e -> {
+            e.setDropCompleted(true);
+            int target = dropIndex;
+            removeIndicator();
+            if (target >= 0 && dragging != null) {
+                moveSourceTo(target);
+            }
+            e.consume();
+        });
+    }
+
+    /** Starts a drag for {@code source}, represented by its {@code tile}. */
+    private void beginDrag(StackPane tile, CalendarSource source, MouseEvent e) {
+        dragging = source;
+        draggedTile = tile;
+        draggedOriginalOpacity = tile.getOpacity();
+        tile.setOpacity(0.4);
+        Dragboard db = tile.startDragAndDrop(TransferMode.MOVE);
+        ClipboardContent content = new ClipboardContent();
+        content.putString(source.name());
+        db.setContent(content);
+        e.consume();
+    }
+
+    /** Restores the visual state of the tile after a drag finishes. */
+    private void endDrag(StackPane tile) {
+        if (draggedTile == tile) {
+            tile.setOpacity(draggedOriginalOpacity);
+            draggedTile = null;
+            dragging = null;
+        }
+    }
+
+    /**
+     * The index in {@code sources} where the dragged source should be dropped,
+     * computed from the horizontal position of the pointer over the tiles.
+     */
+    private int computeDropIndex(double sceneX) {
+        int index = 0;
+        for (Node child : tilesBox.getChildren()) {
+            if (child == indicator || child == addTileNode) {
+                continue;
+            }
+            if (child.localToScene(child.getBoundsInLocal()).getCenterX() <= sceneX) {
+                index++;
+            }
+        }
+        return index;
+    }
+
+    /** Shows the insertion bar at the given index among the source tiles. */
+    private void placeIndicator(int index) {
+        if (indicator == null) {
+            indicator = new Region();
+            indicator.setStyle("-fx-background-color: #2a9d8f; -fx-pref-width: 3; "
+                    + "-fx-min-width: 3; -fx-max-width: 3; -fx-background-radius: 2;");
+            indicator.setMaxHeight(Double.MAX_VALUE);
+            indicator.setOpacity(0.9);
+        }
+        if (indicator.getParent() == tilesBox) {
+            tilesBox.getChildren().remove(indicator);
+        }
+        int target = Math.min(index, tilesBox.getChildren().size());
+        if (target < 0) {
+            target = 0;
+        }
+        tilesBox.getChildren().add(target, indicator);
+        dropIndex = index;
+    }
+
+    /** Hides the insertion bar. */
+    private void removeIndicator() {
+        if (indicator != null && indicator.getParent() == tilesBox) {
+            tilesBox.getChildren().remove(indicator);
+        }
+        dropIndex = -1;
+    }
+
+    /**
+     * Moves the dragged source so it ends up at {@code insertIndex} (a position
+     * in the original list), then persists the new order and rebuilds the tiles.
+     */
+    private void moveSourceTo(int insertIndex) {
+        int from = sources.indexOf(dragging);
+        if (from < 0) {
+            dragging = null;
+            draggedTile = null;
+            return;
+        }
+        int to = insertIndex;
+        sources.remove(from);
+        if (to > from) {
+            to--;
+        }
+        if (to < 0) {
+            to = 0;
+        }
+        if (to > sources.size()) {
+            to = sources.size();
+        }
+        sources.add(to, dragging);
+        dragging = null;
+        draggedTile = null;
+        onSourcesChanged.run();
+        rebuild();
     }
 
     private void toggle(CalendarSource source) {

@@ -16,6 +16,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -140,7 +141,19 @@ public final class CalendarGrid extends BorderPane {
                 map.computeIfAbsent(day, k -> new ArrayList<>()).add(event);
             }
         }
+        map.values().forEach(list -> list.sort(CalendarGrid::byStartTime));
         return map;
+    }
+
+    /** Orders events within a day by their start time; all-day events come first. */
+    private static int byStartTime(CalendarEvent a, CalendarEvent b) {
+        int byKind = Boolean.compare(b.allDay(), a.allDay());
+        if (byKind != 0) {
+            return byKind;
+        }
+        LocalTime at = a.allDay() ? LocalTime.MIN : a.start() == null ? LocalTime.MAX : a.start().toLocalTime();
+        LocalTime bt = b.allDay() ? LocalTime.MIN : b.start() == null ? LocalTime.MAX : b.start().toLocalTime();
+        return at.compareTo(bt);
     }
 
     private void rebuild() {

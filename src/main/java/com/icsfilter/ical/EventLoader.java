@@ -48,7 +48,7 @@ public final class EventLoader {
     }
 
     public String download(String url) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(normalizeUrl(url)))
                 .header("User-Agent", "ics-filter/1.0")
                 .header("Accept", "text/calendar, text/plain, */*")
                 .timeout(Duration.ofSeconds(20))
@@ -60,6 +60,25 @@ public final class EventLoader {
             throw new IOException("HTTP " + status + " for " + url);
         }
         return response.body();
+    }
+
+    /**
+     * Replaces a leading {@code webcal://} (or {@code webcal:}) scheme with
+     * {@code https:}, since {@link HttpRequest} cannot fetch the {@code webcal}
+     * pseudo-scheme. Non-{@code webcal} URLs are returned unchanged.
+     */
+    public static String normalizeUrl(String url) {
+        if (url == null) {
+            return null;
+        }
+        String trimmed = url.trim();
+        if (trimmed.regionMatches(true, 0, "webcal://", 0, 9)) {
+            return "https://" + trimmed.substring(9);
+        }
+        if (trimmed.regionMatches(true, 0, "webcal:", 0, 7)) {
+            return "https:" + trimmed.substring(7);
+        }
+        return url;
     }
 
     /** Downloads and parses a single source. Returns an empty list on failure. */

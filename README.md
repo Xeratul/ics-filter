@@ -20,6 +20,7 @@ Die fertig gebaute, eigenständig lauffähige Windows-EXE findest du unter den [
 - **ICS herunterladen & parsen:** Download über `HTTP/HTTPS`, Parsen mit `ical4j`.
 - **Wiederkehrende Termine:** Eigene RFC-5545-Expansion für `DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY` mit `INTERVAL`, `COUNT`, `UNTIL`, `BYDAY`, `BYMONTH`, `BYMONTHDAY`.
 - **Darstellung:** Monatsraster mit farbigen Termin-Chips (Farbe je Quelle) und eine nach Startzeit sortierte Tabelle.
+- **Listeneinstellungen:** Über das Zahnrad oben rechts in der Tabelle lässt sich das Startdatum einstellen, ab dem Termine angezeigt werden (ab diesem Jahr / Monat / heute).
 
 ## Build
 
@@ -53,7 +54,8 @@ src/main/java/com/icsfilter
 ├── App.java                 # JavaFX-Einstiegs- und Verkabelungsklasse
 ├── model
 │   ├── CalendarSource.java  # Quelle (Name + URL)
-│   └── CalendarEvent.java   # Einzelner Termin
+│   ├── CalendarEvent.java   # Einzelner Termin
+│   └── StartFrom.java       # Startdatum-Grenze der Liste (Jahr/Monat/heute)
 ├── ical
 │   ├── Recurrence.java      # RFC-5545-Wiederholungs-Expansion
 │   └── EventLoader.java     # Download + Parse + Expansion

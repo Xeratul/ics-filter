@@ -43,6 +43,18 @@ class ConfigStoreTest {
         assertEquals(from, loaded.from());
         assertEquals(to, loaded.to());
         assertEquals(categories, loaded.categories());
+        assertEquals("YEAR", loaded.startFrom());
+    }
+
+    @Test
+    void roundTripsStartFrom(@TempDir Path dir) {
+        Path file = dir.resolve("start-from.properties");
+        ConfigStore store = new ConfigStore(file);
+
+        store.save(new ConfigStore.Data(List.of(), new LinkedHashSet<>(), "", null, null,
+                new LinkedHashSet<>(), "TODAY", new ConfigStore.Layout()));
+
+        assertEquals("TODAY", store.load().startFrom());
     }
 
     @Test

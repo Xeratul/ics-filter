@@ -22,6 +22,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -45,6 +46,15 @@ public final class App extends Application {
     private final Label titleLabel = new Label("ICS Filter");
 
     private List<CalendarEvent> allEvents = List.of();
+
+    // Persistent global-filter state (keyword/date range/categories). The UI does
+    // not edit these yet, but we preserve any values from the config file so that
+    // saving here never wipes them.
+    private String keyword = "";
+    private LocalDate from;
+    private LocalDate to;
+    private Set<String> categories = Set.of();
+
     private SplitPane center;
     private SplitPane calendar;
     private Stage stage;
@@ -104,6 +114,10 @@ public final class App extends Application {
         sourceTiles.sources().setAll(data.sources());
         sourceTiles.enabled().clear();
         sourceTiles.enabled().addAll(data.enabled());
+        keyword = data.keyword();
+        from = data.from();
+        to = data.to();
+        categories = data.categories();
         sourceTiles.refresh();
         restoreLayout(data.layout());
         refreshViews();
@@ -139,7 +153,7 @@ public final class App extends Application {
         ConfigStore.Data data = new ConfigStore.Data(
                 new ArrayList<>(sourceTiles.sources()),
                 new LinkedHashSet<>(sourceTiles.enabled()),
-                "", null, null, Set.of(),
+                keyword, from, to, categories,
                 currentLayout());
         store.save(data);
         refreshViews();
@@ -188,12 +202,17 @@ public final class App extends Application {
     /** Recomputes the visible events and updates both views. */
     private void refreshViews() {
         Set<String> enabled = sourceTiles.enabled();
+        // Canonical source order, used everywhere to resolve stable source colours.
+        List<CalendarSource> sources = new ArrayList<>(sourceTiles.sources());
 
         List<CalendarEvent> visible = allEvents.stream()
                 .filter(e -> enabled.contains(e.source().name()))
                 .filter(App::matchesSourceFilter)
                 .toList();
 
+        calendarGrid.setSourceOrder(sources);
+        eventList.setSourceOrder(sources);
+        detailPane.setSourceOrder(sources);
         calendarGrid.setEvents(visible);
         eventList.setEvents(visible);
     }

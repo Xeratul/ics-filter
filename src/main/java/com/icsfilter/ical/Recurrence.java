@@ -239,8 +239,7 @@ public final class Recurrence {
             return byMonthDay.contains(candidate.getDayOfMonth())
                     || byMonthDay.contains(candidate.getDayOfMonth() - (candidate.lengthOfMonth() + 1));
         }
-        return candidate.getDayOfMonth() == seed.getDayOfMonth()
-                || (hasByMonth && candidate.getDayOfMonth() == seed.getDayOfMonth());
+        return candidate.getDayOfMonth() == seed.getDayOfMonth();
     }
 
     private boolean matchesOrdinal(LocalDate candidate, DaySpec ds) {

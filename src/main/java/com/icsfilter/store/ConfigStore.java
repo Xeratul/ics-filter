@@ -68,10 +68,11 @@ public final class ConfigStore {
             String name = p.getProperty("source." + i + ".name", "");
             String url = p.getProperty("source." + i + ".url", "");
             String filter = p.getProperty("source." + i + ".filter", "");
+            String color = p.getProperty("source." + i + ".color", "");
             if (name.isEmpty() && url.isEmpty()) {
                 continue;
             }
-            sources.add(new CalendarSource(name, url, filter));
+            sources.add(new CalendarSource(name, url, filter, color));
         }
 
         Set<String> enabled = new LinkedHashSet<>();
@@ -121,6 +122,7 @@ public final class ConfigStore {
                 p.setProperty("source." + i + ".name", s.name());
                 p.setProperty("source." + i + ".url", s.url());
                 p.setProperty("source." + i + ".filter", s.filter());
+                p.setProperty("source." + i + ".color", s.color());
             }
 
             List<String> enabled = new ArrayList<>(data.enabled());

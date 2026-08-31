@@ -10,6 +10,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
@@ -85,7 +86,7 @@ public final class SourceTilesBar extends VBox {
 
     private StackPane sourceTile(CalendarSource source) {
         int index = sources.indexOf(source);
-        Color color = UiPalette.colorFor(index < 0 ? 0 : index);
+        Color color = UiPalette.resolveColor(source, index < 0 ? 0 : index);
         boolean on = enabled.contains(source.name());
 
         Label name = new Label(source.name());
@@ -173,12 +174,13 @@ public final class SourceTilesBar extends VBox {
         TextField name = new TextField();
         TextField url = new TextField();
         TextField filter = new TextField();
+        ColorPicker color = new ColorPicker(UiPalette.colorFor(sources.size()));
         Dialog<CalendarSource> dialog = new Dialog<>();
         dialog.setTitle("Neue Quelle");
         ButtonType save = new ButtonType("Hinzufügen", ButtonBar.ButtonData.OK_DONE);
         ButtonType cancel = new ButtonType("Abbrechen", ButtonBar.ButtonData.CANCEL_CLOSE);
         dialog.getDialogPane().getButtonTypes().addAll(save, cancel);
-        dialog.getDialogPane().setContent(formGrid(name, url, filter));
+        dialog.getDialogPane().setContent(formGrid(name, url, filter, color));
         dialog.getDialogPane().setPrefWidth(380);
         wireValidation(dialog.getDialogPane(), save, name, url);
         dialog.setResultConverter(bt -> {
@@ -188,7 +190,7 @@ public final class SourceTilesBar extends VBox {
                 if (n.isEmpty() || u.isEmpty()) {
                     return null;
                 }
-                return new CalendarSource(n, u, filter.getText().trim());
+                return new CalendarSource(n, u, filter.getText().trim(), UiPalette.toCss(color.getValue()));
             }
             return null;
         });
@@ -204,13 +206,15 @@ public final class SourceTilesBar extends VBox {
         TextField name = new TextField(original.name());
         TextField url = new TextField(original.url());
         TextField filter = new TextField(original.filter());
+        int pickIdx = sources.indexOf(original);
+        ColorPicker color = new ColorPicker(UiPalette.resolveColor(original, pickIdx < 0 ? 0 : pickIdx));
         Dialog<DialogResult> dialog = new Dialog<>();
         dialog.setTitle("Quelle bearbeiten");
         ButtonType save = new ButtonType("Speichern", ButtonBar.ButtonData.OK_DONE);
         ButtonType delete = new ButtonType("Entfernen", ButtonBar.ButtonData.OTHER);
         ButtonType cancel = new ButtonType("Abbrechen", ButtonBar.ButtonData.CANCEL_CLOSE);
         dialog.getDialogPane().getButtonTypes().addAll(save, delete, cancel);
-        dialog.getDialogPane().setContent(formGrid(name, url, filter));
+        dialog.getDialogPane().setContent(formGrid(name, url, filter, color));
         dialog.getDialogPane().setPrefWidth(380);
         wireValidation(dialog.getDialogPane(), save, name, url);
         dialog.setResultConverter(bt -> {
@@ -220,7 +224,8 @@ public final class SourceTilesBar extends VBox {
                 if (n.isEmpty() || u.isEmpty()) {
                     return null;
                 }
-                return new DialogResult(new CalendarSource(n, u, filter.getText().trim()), false);
+                return new DialogResult(new CalendarSource(n, u, filter.getText().trim(),
+                        UiPalette.toCss(color.getValue())), false);
             }
             if (bt == delete) {
                 return new DialogResult(null, true);
@@ -247,7 +252,7 @@ public final class SourceTilesBar extends VBox {
         });
     }
 
-    private GridPane formGrid(TextField name, TextField url, TextField filter) {
+    private GridPane formGrid(TextField name, TextField url, TextField filter, ColorPicker color) {
         name.setPromptText("Name");
         url.setPromptText("https://.../calendar.ics");
         filter.setPromptText("Filter (im Titel)");
@@ -262,9 +267,12 @@ public final class SourceTilesBar extends VBox {
         grid.add(url, 1, 1);
         grid.add(new Label("Filter"), 0, 2);
         grid.add(filter, 1, 2);
+        grid.add(new Label("Farbe"), 0, 3);
+        grid.add(color, 1, 3);
         GridPane.setHgrow(name, Priority.ALWAYS);
         GridPane.setHgrow(url, Priority.ALWAYS);
         GridPane.setHgrow(filter, Priority.ALWAYS);
+        color.setMaxWidth(Double.MAX_VALUE);
         grid.setMaxWidth(Double.MAX_VALUE);
         return grid;
     }

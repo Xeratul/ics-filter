@@ -1,5 +1,6 @@
 package com.icsfilter.ui;
 
+import com.icsfilter.model.CalendarSource;
 import javafx.scene.paint.Color;
 
 /** Provides a stable color per source index. */
@@ -17,5 +18,25 @@ public final class UiPalette {
 
     public static Color colorFor(int index) {
         return COLORS[Math.floorMod(index, COLORS.length)];
+    }
+
+    /** The source's own color when set, otherwise the palette color by index. */
+    public static Color resolveColor(CalendarSource source, int index) {
+        if (source != null && !source.color().isBlank()) {
+            try {
+                return Color.web(source.color());
+            } catch (IllegalArgumentException ignored) {
+                // Fall through to the default palette color.
+            }
+        }
+        return colorFor(index);
+    }
+
+    /** Converts a color to a CSS hex string, e.g. {@code "#e63946"}. */
+    public static String toCss(Color color) {
+        return String.format("#%02x%02x%02x",
+                (int) Math.round(color.getRed() * 255),
+                (int) Math.round(color.getGreen() * 255),
+                (int) Math.round(color.getBlue() * 255));
     }
 }

@@ -103,17 +103,13 @@ public final class CalendarGrid extends BorderPane {
         rebuild();
     }
 
-    /** Builds a colour-index map so source colours stay stable across rebuilds. */
+    /** Builds a colour map so source colours stay stable across rebuilds. */
     private Map<String, Color> sourceColors() {
         Map<String, Color> colors = new LinkedHashMap<>();
-        List<String> names = new ArrayList<>();
         for (CalendarEvent event : events) {
-            if (!names.contains(event.source().name())) {
-                names.add(event.source().name());
+            if (!colors.containsKey(event.source().name())) {
+                colors.put(event.source().name(), UiPalette.resolveColor(event.source(), colors.size()));
             }
-        }
-        for (int i = 0; i < names.size(); i++) {
-            colors.put(names.get(i), UiPalette.colorFor(i));
         }
         return colors;
     }

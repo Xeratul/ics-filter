@@ -99,7 +99,7 @@ public final class EventListPane extends VBox {
                 }
                 setText(event.source().name());
                 int idx = items.indexOf(event);
-                Color color = UiPalette.colorFor(idx < 0 ? 0 : idx);
+                Color color = UiPalette.resolveColor(event.source(), idx < 0 ? 0 : idx);
                 setStyle("-fx-text-fill: " + toCss(color) + ";");
             }
         });

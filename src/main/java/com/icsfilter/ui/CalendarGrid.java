@@ -740,6 +740,7 @@ public final class CalendarGrid extends BorderPane {
         weekGrid.setPadding(new Insets(4));
         weekGrid.setHgap(2);
         weekGrid.setVgap(2);
+        weekGrid.setStyle("-fx-background-color: #ffffff;");
 
         // Top row: day-header labels (with the selected day shown). Cell (0,0) holds a spacer for the gutter.
         Label corner = new Label("");
@@ -819,7 +820,7 @@ public final class CalendarGrid extends BorderPane {
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        scroll.setStyle("-fx-background-color: transparent; -fx-background-insets: 0;");
+        scroll.setStyle("-fx-background-color: #ffffff; -fx-background-insets: 0;");
         scroll.setPannable(true);
         return scroll;
     }
@@ -894,23 +895,9 @@ public final class CalendarGrid extends BorderPane {
         return box;
     }
 
-    /** Clamps the peak hour range covering all timed events, matching the day-popup behaviour. */
+    /** Week mode always shows a fixed 8:00–20:00 range so the time gutter stays stable. */
     private static int[] hourRange(List<CalendarEvent> timed) {
-        if (timed.isEmpty()) {
-            return new int[]{8, 18};
-        }
-        int min = 24;
-        int max = 0;
-        for (CalendarEvent e : timed) {
-            java.time.ZonedDateTime s = e.start();
-            java.time.ZonedDateTime en = e.end();
-            min = Math.min(min, s.getHour());
-            int eh = en == null ? s.getHour() + 1 : Math.max(en.getHour() + (en.getMinute() > 0 ? 1 : 0), s.getHour() + 1);
-            max = Math.max(max, eh);
-        }
-        min = Math.max(0, min);
-        max = Math.min(24, Math.max(max, min + 1));
-        return new int[]{min, max};
+        return new int[]{8, 20};
     }
 
     /** A single day cell. */

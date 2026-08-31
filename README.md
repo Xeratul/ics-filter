@@ -18,6 +18,7 @@ Die fertig gebaute, eigenständig lauffähige Windows-EXE findest du unter den [
 ## Features
 
 - **Kalenderquellen verwalten:** Quellen (Name + URL) als schaltbare Kacheln in der oberen Leiste; hinzufügen, bearbeiten, entfernen, einzeln aktivieren/deaktivieren und neu laden. Hinzufügen/Bearbeiten erfolgt über einen Dialog.
+- **Termine ignorieren:** Rechtsklick auf einen Listeneintrag → „Diese Einträge ignorieren“ blendet alle gleich betitelten Termine dieser Quelle aus. Die ignorierte Titel-Liste ist im Quellen-Dialog sichtbar und lässt sich dort wieder löschen.
 - **ICS herunterladen & parsen:** Download über `HTTP/HTTPS`, Parsen mit `ical4j`.
 - **Wiederkehrende Termine:** Eigene RFC-5545-Expansion für `DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY` mit `INTERVAL`, `COUNT`, `UNTIL`, `BYDAY`, `BYMONTH`, `BYMONTHDAY`.
 - **Darstellung:** Monatsraster mit farbigen Termin-Chips (Farbe je Quelle) und eine nach Startzeit sortierte Tabelle.
@@ -54,7 +55,7 @@ Ausgabe: `target/dist/ICS Filter/ICS Filter.exe` — der gesamte Ordner
 src/main/java/com/icsfilter
 ├── App.java                 # JavaFX-Einstiegs- und Verkabelungsklasse
 ├── model
-│   ├── CalendarSource.java  # Quelle (Name + URL)
+│   ├── CalendarSource.java  # Quelle (Name + URL + Filter + Farbe + Ignorierte Titel)
 │   ├── CalendarEvent.java   # Einzelner Termin
 │   └── StartFrom.java       # Startdatum-Grenze der Liste (Jahr/Monat/heute)
 ├── ical

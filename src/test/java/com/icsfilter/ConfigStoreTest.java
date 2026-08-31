@@ -11,6 +11,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConfigStoreTest {
 
@@ -74,6 +76,24 @@ class ConfigStoreTest {
         assertEquals(1200.0, loaded.windowWidth());
         assertEquals(800.0, loaded.windowHeight());
         assertEquals(widths, loaded.columnWidths());
+    }
+
+    @Test
+    void roundTripsIgnoreTitles(@TempDir Path dir) {
+        Path file = dir.resolve("ignore.properties");
+        ConfigStore store = new ConfigStore(file);
+
+        List<CalendarSource> sources = List.of(
+                new CalendarSource("Arbeit", "https://example.com/work.ics", "Meeting", "#457b9d",
+                        List.of("Standup", "Sprint Review")));
+        store.save(new ConfigStore.Data(sources, new LinkedHashSet<>(), "", null, null,
+                new LinkedHashSet<>(), "YEAR", new ConfigStore.Layout()));
+
+        CalendarSource loaded = store.load().sources().get(0);
+        assertEquals(List.of("Standup", "Sprint Review"), loaded.ignoreTitles());
+        assertTrue(loaded.ignores("Standup"));
+        assertFalse(loaded.ignores("standup"), "ignore match must be case-sensitive");
+        assertFalse(loaded.ignores("Other"));
     }
 
     @Test

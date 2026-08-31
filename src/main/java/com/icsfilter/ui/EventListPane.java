@@ -3,6 +3,7 @@ package com.icsfilter.ui;
 import com.icsfilter.model.CalendarEvent;
 import com.icsfilter.model.CalendarSource;
 import com.icsfilter.model.StartFrom;
+import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -10,11 +11,14 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleGroup;
@@ -47,6 +51,7 @@ public final class EventListPane extends VBox {
     private List<CalendarEvent> lastEvents = List.of();
     private StartFrom startFrom = StartFrom.YEAR;
     private Consumer<StartFrom> onStartFromChanged = m -> { };
+    private Consumer<CalendarEvent> onIgnoreRequest = e -> { };
 
     public EventListPane() {
         setSpacing(6);
@@ -146,6 +151,7 @@ public final class EventListPane extends VBox {
         table.getColumns().addAll(dateCol, timeCol, titleCol, sourceCol, locationCol);
         table.setItems(items);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setRowFactory(tv -> contextMenuRow());
         VBox.setVgrow(table, Priority.ALWAYS);
 
         HBox header = new HBox(8);
@@ -194,6 +200,28 @@ public final class EventListPane extends VBox {
                         onEventSelected.accept(n);
                     }
                 });
+    }
+
+    /** Registers a callback fired when the user requests ignoring an event's title. */
+    public void setOnIgnoreRequest(Consumer<CalendarEvent> onIgnoreRequest) {
+        this.onIgnoreRequest = onIgnoreRequest == null ? e -> { } : onIgnoreRequest;
+    }
+
+    /** A table row exposing a right-click menu to ignore the event's title. */
+    private TableRow<CalendarEvent> contextMenuRow() {
+        TableRow<CalendarEvent> row = new TableRow<>();
+        ContextMenu menu = new ContextMenu();
+        MenuItem ignore = new MenuItem("Diese Einträge ignorieren");
+        ignore.setOnAction(e -> {
+            CalendarEvent event = row.getItem();
+            if (event != null) {
+                onIgnoreRequest.accept(event);
+            }
+        });
+        menu.getItems().add(ignore);
+        row.contextMenuProperty().bind(
+                Bindings.when(row.emptyProperty()).then((ContextMenu) null).otherwise(menu));
+        return row;
     }
 
     /** Snapshot of the current column widths, in column order. */

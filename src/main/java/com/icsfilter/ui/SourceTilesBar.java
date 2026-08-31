@@ -23,7 +23,9 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -166,6 +168,42 @@ public final class SourceTilesBar extends VBox {
         rebuild();
     }
 
+    /**
+     * Adds an event title to the source's ignore list (matched by source name,
+     * so it also works with events that still point to a pre-edit source
+     * object), then persists the change and rebuilds the tiles.
+     */
+    public void ignoreTitle(CalendarSource source, String title) {
+        if (title == null || title.isBlank()) {
+            return;
+        }
+        int idx = nameIndex(source == null ? null : source.name());
+        if (idx < 0) {
+            return;
+        }
+        CalendarSource current = sources.get(idx);
+        List<String> ignored = new ArrayList<>(current.ignoreTitles());
+        if (!ignored.contains(title)) {
+            ignored.add(title);
+        }
+        sources.set(idx, new CalendarSource(current.name(), current.url(), current.filter(), current.color(), ignored));
+        onSourcesChanged.run();
+        rebuild();
+    }
+
+    /** Index of the source with the given name, or -1. */
+    private int nameIndex(String name) {
+        if (name == null) {
+            return -1;
+        }
+        for (int i = 0; i < sources.size(); i++) {
+            if (name.equals(sources.get(i).name())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     // ------------------------------------------------------------------
     // Dialogs
     // ------------------------------------------------------------------
@@ -208,13 +246,16 @@ public final class SourceTilesBar extends VBox {
         TextField filter = new TextField(original.filter());
         int pickIdx = sources.indexOf(original);
         ColorPicker color = new ColorPicker(UiPalette.resolveColor(original, pickIdx < 0 ? 0 : pickIdx));
+        List<String> ignored = new ArrayList<>(original.ignoreTitles());
         Dialog<DialogResult> dialog = new Dialog<>();
         dialog.setTitle("Quelle bearbeiten");
         ButtonType save = new ButtonType("Speichern", ButtonBar.ButtonData.OK_DONE);
         ButtonType delete = new ButtonType("Entfernen", ButtonBar.ButtonData.OTHER);
         ButtonType cancel = new ButtonType("Abbrechen", ButtonBar.ButtonData.CANCEL_CLOSE);
         dialog.getDialogPane().getButtonTypes().addAll(save, delete, cancel);
-        dialog.getDialogPane().setContent(formGrid(name, url, filter, color));
+        VBox content = new VBox(12);
+        content.getChildren().addAll(formGrid(name, url, filter, color), ignoreListSection(ignored));
+        dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().setPrefWidth(380);
         wireValidation(dialog.getDialogPane(), save, name, url);
         dialog.setResultConverter(bt -> {
@@ -225,7 +266,7 @@ public final class SourceTilesBar extends VBox {
                     return null;
                 }
                 return new DialogResult(new CalendarSource(n, u, filter.getText().trim(),
-                        UiPalette.toCss(color.getValue())), false);
+                        UiPalette.toCss(color.getValue()), ignored), false);
             }
             if (bt == delete) {
                 return new DialogResult(null, true);
@@ -250,6 +291,44 @@ public final class SourceTilesBar extends VBox {
             onSourcesChanged.run();
             rebuild();
         });
+    }
+
+    /** Builds the section listing the ignored titles, each with a remove button. */
+    private VBox ignoreListSection(List<String> ignored) {
+        VBox section = new VBox(6);
+        Label header = new Label("Ignorierte Titel:");
+        header.setStyle("-fx-font-weight: bold;");
+        section.getChildren().add(header);
+        VBox list = new VBox(4);
+        section.getChildren().add(list);
+        renderIgnoreList(list, ignored);
+        return section;
+    }
+
+    /** Re-renders the list of ignored titles into {@code list}. */
+    private void renderIgnoreList(VBox list, List<String> ignored) {
+        list.getChildren().clear();
+        if (ignored.isEmpty()) {
+            Label none = new Label("Keine");
+            none.setStyle("-fx-text-fill: #888;");
+            list.getChildren().add(none);
+            return;
+        }
+        for (String title : ignored) {
+            HBox row = new HBox(6);
+            row.setAlignment(Pos.CENTER_LEFT);
+            Label label = new Label(title);
+            label.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(label, Priority.ALWAYS);
+            Button remove = new Button("Entfernen");
+            remove.setFocusTraversable(false);
+            remove.setOnAction(e -> {
+                ignored.remove(title);
+                renderIgnoreList(list, ignored);
+            });
+            row.getChildren().addAll(label, remove);
+            list.getChildren().add(row);
+        }
     }
 
     private GridPane formGrid(TextField name, TextField url, TextField filter, ColorPicker color) {

@@ -34,11 +34,17 @@ public final class ConfigStore {
     /** All persisted application state. */
     public record Data(List<CalendarSource> sources, Set<String> enabled,
                        String keyword, LocalDate from, LocalDate to, Set<String> categories,
-                       Layout layout) {
+                       String startFrom, Layout layout) {
+
+        public Data(List<CalendarSource> sources, Set<String> enabled,
+                    String keyword, LocalDate from, LocalDate to, Set<String> categories,
+                    Layout layout) {
+            this(sources, enabled, keyword, from, to, categories, "YEAR", layout);
+        }
 
         public Data(List<CalendarSource> sources, Set<String> enabled,
                     String keyword, LocalDate from, LocalDate to, Set<String> categories) {
-            this(sources, enabled, keyword, from, to, categories, new Layout());
+            this(sources, enabled, keyword, from, to, categories, "YEAR", new Layout());
         }
     }
 
@@ -87,6 +93,7 @@ public final class ConfigStore {
         String keyword = p.getProperty("filter.keyword", "");
         LocalDate from = parseDate(p.getProperty("filter.from", ""));
         LocalDate to = parseDate(p.getProperty("filter.to", ""));
+        String startFrom = p.getProperty("filter.startFrom", "YEAR");
         Set<String> categories = new LinkedHashSet<>();
         String catProp = p.getProperty("filter.categories", "");
         if (!catProp.isBlank()) {
@@ -107,7 +114,7 @@ public final class ConfigStore {
         Layout layout = new Layout(hDivider, vDivider, windowX, windowY,
                 windowWidth, windowHeight, columnWidths);
 
-        return new Data(sources, enabled, keyword, from, to, categories, layout);
+        return new Data(sources, enabled, keyword, from, to, categories, startFrom, layout);
     }
 
     public void save(Data data) {
@@ -134,6 +141,7 @@ public final class ConfigStore {
             p.setProperty("filter.keyword", data.keyword() == null ? "" : data.keyword());
             p.setProperty("filter.from", data.from() == null ? "" : data.from().toString());
             p.setProperty("filter.to", data.to() == null ? "" : data.to().toString());
+            p.setProperty("filter.startFrom", data.startFrom() == null ? "YEAR" : data.startFrom());
             p.setProperty("filter.categories", String.join(",", data.categories()));
 
             Layout layout = data.layout();

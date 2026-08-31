@@ -3,6 +3,7 @@ package com.icsfilter;
 import com.icsfilter.ical.EventLoader;
 import com.icsfilter.model.CalendarEvent;
 import com.icsfilter.model.CalendarSource;
+import com.icsfilter.model.StartFrom;
 import com.icsfilter.store.ConfigStore;
 import com.icsfilter.ui.CalendarGrid;
 import com.icsfilter.ui.EventDetailPane;
@@ -54,6 +55,7 @@ public final class App extends Application {
     private LocalDate from;
     private LocalDate to;
     private Set<String> categories = Set.of();
+    private StartFrom startFrom = StartFrom.YEAR;
 
     private SplitPane center;
     private SplitPane calendar;
@@ -106,6 +108,12 @@ public final class App extends Application {
         stage.show();
         stage.setOnCloseRequest(e -> persistAndRefresh());
         restore();
+        // Wire the "start from" change callback after restore() so that applying
+        // the persisted value during startup does not trigger a redundant save.
+        eventList.setOnStartFromChanged(mode -> {
+            this.startFrom = mode;
+            persistAndRefresh();
+        });
     }
 
     /** Restores sources, enabled flags, filters and the window layout. */
@@ -118,6 +126,8 @@ public final class App extends Application {
         from = data.from();
         to = data.to();
         categories = data.categories();
+        startFrom = parseStartFrom(data.startFrom());
+        eventList.setStartFrom(startFrom);
         sourceTiles.refresh();
         restoreLayout(data.layout());
         refreshViews();
@@ -154,7 +164,7 @@ public final class App extends Application {
                 new ArrayList<>(sourceTiles.sources()),
                 new LinkedHashSet<>(sourceTiles.enabled()),
                 keyword, from, to, categories,
-                currentLayout());
+                startFrom.name(), currentLayout());
         store.save(data);
         refreshViews();
     }
@@ -215,6 +225,18 @@ public final class App extends Application {
         detailPane.setSourceOrder(sources);
         calendarGrid.setEvents(visible);
         eventList.setEvents(visible);
+    }
+
+    /** Parses the persisted {@code startFrom} mode, falling back to the default. */
+    private static StartFrom parseStartFrom(String s) {
+        if (s == null) {
+            return StartFrom.YEAR;
+        }
+        try {
+            return StartFrom.valueOf(s.trim());
+        } catch (RuntimeException e) {
+            return StartFrom.YEAR;
+        }
     }
 
     /** Keeps only events whose summary contains their source's filter string. */

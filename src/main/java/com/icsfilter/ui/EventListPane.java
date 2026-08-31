@@ -2,17 +2,30 @@ package com.icsfilter.ui;
 
 import com.icsfilter.model.CalendarEvent;
 import com.icsfilter.model.CalendarSource;
+import com.icsfilter.model.StartFrom;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.Toggle;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
@@ -31,6 +44,9 @@ public final class EventListPane extends VBox {
     private final TableView<CalendarEvent> table = new TableView<>();
     private final ObservableList<CalendarEvent> items = FXCollections.observableArrayList();
     private List<CalendarSource> sourceOrder = List.of();
+    private List<CalendarEvent> lastEvents = List.of();
+    private StartFrom startFrom = StartFrom.YEAR;
+    private Consumer<StartFrom> onStartFromChanged = m -> { };
 
     public EventListPane() {
         setSpacing(6);
@@ -132,7 +148,43 @@ public final class EventListPane extends VBox {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         VBox.setVgrow(table, Priority.ALWAYS);
 
-        getChildren().addAll(countLabel, table);
+        HBox header = new HBox(8);
+        header.setAlignment(Pos.CENTER_LEFT);
+        Button settingsButton = settingsButton();
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        header.getChildren().addAll(countLabel, spacer, settingsButton);
+
+        getChildren().addAll(header, table);
+    }
+
+    /** The gear button in the top-right corner opens the settings dialog. */
+    private Button settingsButton() {
+        Button button = new Button("\u2699");
+        button.setFocusTraversable(false);
+        button.setStyle("-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: 16; -fx-padding: 0 4 0 4;");
+        button.setTooltip(new Tooltip("Einstellungen"));
+        button.setOnAction(e -> openSettingsDialog());
+        return button;
+    }
+
+    /** The current "start from" cutoff applied to the list. */
+    public StartFrom startFrom() {
+        return startFrom;
+    }
+
+    /** Sets the cutoff and re-applies it; notifies {@code onStartFromChanged}. */
+    public void setStartFrom(StartFrom startFrom) {
+        if (startFrom == null || this.startFrom == startFrom) {
+            return;
+        }
+        this.startFrom = startFrom;
+        refresh();
+        onStartFromChanged.accept(startFrom);
+    }
+
+    public void setOnStartFromChanged(Consumer<StartFrom> onStartFromChanged) {
+        this.onStartFromChanged = onStartFromChanged == null ? m -> { } : onStartFromChanged;
     }
 
     public void setOnEventSelected(Consumer<CalendarEvent> onEventSelected) {
@@ -172,12 +224,68 @@ public final class EventListPane extends VBox {
     }
 
     public void setEvents(List<CalendarEvent> events) {
-        List<CalendarEvent> sorted = new java.util.ArrayList<>(events == null ? List.of() : events);
+        this.lastEvents = events == null ? List.of() : events;
+        refresh();
+    }
+
+    /** Recomputes the matching rows (after the {@code startFrom} cutoff) and refreshes the label. */
+    private void refresh() {
+        LocalDate cutoff = startFrom.effectiveDate(LocalDate.now());
+        List<CalendarEvent> sorted = new java.util.ArrayList<>(lastEvents.stream()
+                .filter(e -> e.startDate() == null || !e.startDate().isBefore(cutoff))
+                .toList());
         sorted.sort(Comparator.comparing(CalendarEvent::startDate)
                 .thenComparing(e -> e.start() == null ? java.time.LocalDateTime.MIN
                         : e.start().toLocalDateTime()));
         items.setAll(sorted);
         countLabel.setText(sorted.size() + " Termine");
+    }
+
+    /** Opens the settings dialog to choose the "start from" cutoff. */
+    private void openSettingsDialog() {
+        ToggleGroup group = new ToggleGroup();
+        RadioButton year = radio("Ab diesem Jahr", StartFrom.YEAR, group);
+        RadioButton month = radio("Ab diesem Monat", StartFrom.MONTH, group);
+        RadioButton today = radio("Ab heute", StartFrom.TODAY, group);
+        select(group, startFrom);
+
+        VBox box = new VBox(8,
+                new Label("Zeige Termine ab:"),
+                year, month, today);
+        box.setPadding(new Insets(12));
+
+        Dialog<StartFrom> dialog = new Dialog<>();
+        dialog.setTitle("Einstellungen");
+        ButtonType save = new ButtonType("Speichern", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancel = new ButtonType("Abbrechen", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(save, cancel);
+        dialog.getDialogPane().setContent(box);
+        dialog.setResultConverter(bt -> bt == save ? selected(group) : null);
+        dialog.showAndWait().ifPresent(this::setStartFrom);
+    }
+
+    private static RadioButton radio(String label, StartFrom value, ToggleGroup group) {
+        RadioButton rb = new RadioButton(label);
+        rb.setToggleGroup(group);
+        rb.setUserData(value);
+        return rb;
+    }
+
+    private static void select(ToggleGroup group, StartFrom value) {
+        for (Toggle toggle : group.getToggles()) {
+            if (toggle.getUserData() == value) {
+                toggle.setSelected(true);
+                return;
+            }
+        }
+    }
+
+    private static StartFrom selected(ToggleGroup group) {
+        Toggle selected = group.getSelectedToggle();
+        if (selected != null && selected.getUserData() instanceof StartFrom s) {
+            return s;
+        }
+        return StartFrom.YEAR;
     }
 
     /** Sorting key for the time column: all-day events sort first within a day. */

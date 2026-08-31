@@ -108,6 +108,25 @@ class EventLoaderTest {
         assertEquals(1, events.size());
     }
 
+    @Test
+    void normalizesWebcalToHttps() {
+        assertEquals("https://example.com/cal.ics",
+                EventLoader.normalizeUrl("webcal://example.com/cal.ics"));
+        assertEquals("https://example.com/cal.ics",
+                EventLoader.normalizeUrl("  WEBCAL://example.com/cal.ics  "));
+        assertEquals("https:example.com/cal.ics",
+                EventLoader.normalizeUrl("webcal:example.com/cal.ics"));
+    }
+
+    @Test
+    void leavesHttpsUrlsUnchanged() {
+        assertEquals("https://example.com/cal.ics",
+                EventLoader.normalizeUrl("https://example.com/cal.ics"));
+        assertEquals("http://example.com/cal.ics",
+                EventLoader.normalizeUrl("http://example.com/cal.ics"));
+        assertEquals(null, EventLoader.normalizeUrl(null));
+    }
+
     private String filterCategory(List<CalendarEvent> events) {
         for (CalendarEvent e : events) {
             if (e.category() != null && !e.category().isBlank()) {

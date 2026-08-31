@@ -11,6 +11,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
@@ -37,9 +39,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
- * A month calendar grid that shows the events of each day as colored chips.
+ * A calendar grid that shows the events of each day as colored chips, switchable between a
+ * month view (six weeks) and a week view where each day is laid out like the day popup.
  */
 public final class CalendarGrid extends BorderPane {
 
@@ -56,6 +60,18 @@ public final class CalendarGrid extends BorderPane {
     private static final double MIN_DAY_HOUR_H = 22;
     /** Maximum pixels per hour in the enlarged day view. */
     private static final double MAX_DAY_HOUR_H = 44;
+    /** Accent colour used for the selected day in week mode. */
+    private static final String WEEK_ACCENT = "#2a9d8f";
+    /** Target height (px) of the week body, used to size the hour scale before layout. */
+    private static final double WEEK_TARGET_H = 420;
+    /** Height allocated to the all-day chip row in week mode. */
+    private static final double WEEK_ALLDAY_H = 20;
+    /** Height of the week day-header row in week mode. */
+    private static final double WEEK_HEADER_H = 24;
+    /** Width of the shared time-gutter column in week mode. */
+    private static final double WEEK_GUTTER_W = 40;
+    /** Minimum width of a single day's timed track in week mode. */
+    private static final double WEEK_MIN_TRACK_W = 100;
 
     private final Label monthLabel = new Label();
     private final GridPane grid = new GridPane();
@@ -68,6 +84,14 @@ public final class CalendarGrid extends BorderPane {
     private LocalDate selected = LocalDate.now();
     /** The date whose tile is currently enlarged, or {@code null}. */
     private LocalDate expandedDate;
+    /** True when the grid shows a single week (each day like the day popup) instead of a month. */
+    private boolean weekMode = false;
+    /** Monday of the week currently shown in week mode. */
+    private LocalDate weekStart = weekStart(LocalDate.now());
+    /** Day-header labels of the current week view, restyled when the selection changes. */
+    private final List<Label> weekDayLabels = new ArrayList<>();
+    private final ToggleButton monthToggle = new ToggleButton("Monat");
+    private final ToggleButton weekToggle = new ToggleButton("Woche");
     private List<CalendarEvent> events = List.of();
     private List<CalendarSource> sourceOrder = List.of();
     private Consumer<LocalDate> onDaySelected = d -> { };
@@ -89,7 +113,16 @@ public final class CalendarGrid extends BorderPane {
         HBox.setHgrow(spacerLeft, Priority.ALWAYS);
         Region spacerRight = new Region();
         HBox.setHgrow(spacerRight, Priority.ALWAYS);
-        toolbar.getChildren().addAll(prev, next, spacerLeft, monthLabel, spacerRight, today);
+
+        ToggleGroup viewGroup = new ToggleGroup();
+        monthToggle.setToggleGroup(viewGroup);
+        weekToggle.setToggleGroup(viewGroup);
+        monthToggle.setSelected(true);
+        monthToggle.setOnAction(e -> setViewMode(false));
+        weekToggle.setOnAction(e -> setViewMode(true));
+        updateToggleStyles();
+
+        toolbar.getChildren().addAll(prev, next, spacerLeft, monthLabel, spacerRight, today, monthToggle, weekToggle);
 
         grid.setHgap(3);
         grid.setVgap(3);
@@ -125,6 +158,12 @@ public final class CalendarGrid extends BorderPane {
 
         setTop(toolbar);
         setCenter(gridLayer);
+        // Once the grid has a real height, size the week hour scale to fill it.
+        gridLayer.heightProperty().addListener((obs, oldH, newH) -> {
+            if (weekMode && newH != null && newH.doubleValue() > 0) {
+                rebuild();
+            }
+        });
         rebuild();
     }
 
@@ -150,25 +189,69 @@ public final class CalendarGrid extends BorderPane {
         if (date == null) {
             return;
         }
-        YearMonth m = YearMonth.from(date);
-        boolean monthChanged = !m.equals(month);
         this.selected = date;
-        this.month = m;
-        if (monthChanged) {
-            rebuild();
+        if (weekMode) {
+            LocalDate newStart = weekStart(date);
+            if (!newStart.equals(weekStart)) {
+                weekStart = newStart;
+                rebuild();
+            } else {
+                updateSelection();
+            }
         } else {
-            updateSelection();
+            YearMonth m = YearMonth.from(date);
+            boolean monthChanged = !m.equals(month);
+            this.month = m;
+            if (monthChanged) {
+                rebuild();
+            } else {
+                updateSelection();
+            }
         }
     }
 
-    private void navigate(int delta) {
-        month = month.plusMonths(delta);
+    /** True when the grid shows the week instead of the month view. */
+    public boolean isWeekMode() {
+        return weekMode;
+    }
+
+    /** Switches between the month and week views, keeping the selected day in focus. */
+    private void setViewMode(boolean week) {
+        if (this.weekMode == week) {
+            return;
+        }
+        this.weekMode = week;
+        if (week) {
+            weekStart = weekStart(selected);
+        } else {
+            month = YearMonth.from(selected);
+        }
+        updateToggleStyles();
         rebuild();
+    }
+
+    /** Highlights the active view-mode toggle and dims the inactive one. */
+    private void updateToggleStyles() {
+        String active = "-fx-background-color: #cdeeea; -fx-text-fill: #1f1f1f; -fx-font-size: 11; -fx-font-weight: bold;";
+        String inactive = "-fx-font-size: 11;";
+        monthToggle.setStyle(weekMode ? inactive : active);
+        weekToggle.setStyle(weekMode ? active : inactive);
+    }
+
+    private void navigate(int delta) {
+        if (weekMode) {
+            weekStart = weekStart.plusWeeks(delta);
+            rebuild();
+        } else {
+            month = month.plusMonths(delta);
+            rebuild();
+        }
     }
 
     private void goToToday() {
         selected = LocalDate.now();
         month = YearMonth.now();
+        weekStart = weekStart(selected);
         rebuild();
     }
 
@@ -258,6 +341,11 @@ public final class CalendarGrid extends BorderPane {
             return max;
         }
         return v;
+    }
+
+    /** Returns the Monday of the week containing {@code date}. */
+    private static LocalDate weekStart(LocalDate date) {
+        return date.minusDays(date.getDayOfWeek().getValue() - 1L);
     }
 
     private static String toCss(Color color) {
@@ -382,6 +470,43 @@ public final class CalendarGrid extends BorderPane {
         track.setPrefSize(trackW, trackH);
         track.setMinSize(trackW, trackH);
         track.setMaxSize(trackW, trackH);
+        addTimedBlocks(track, timed, colors, trackW, trackH, startHour, endHour, hourH);
+
+        // All-day events appear as a full-width block above the time grid.
+        if (!allDay.isEmpty()) {
+            VBox allDayBox = timedTrack(allDay, colors, trackW);
+            VBox wrap = new VBox(2, allDayBox, new HBox(timeCol, track));
+            return wrap;
+        }
+
+        day.getChildren().addAll(timeCol, track);
+        return day;
+    }
+
+    /** Builds a thin block listing all-day events for a full width. */
+    private VBox timedTrack(List<CalendarEvent> allDay, Map<String, Color> colors, double trackW) {
+        VBox box = new VBox(2);
+        box.setPrefWidth(trackW);
+        for (CalendarEvent e : allDay) {
+            Color c = colors.getOrDefault(e.source().name(), Color.web("#999"));
+            Label chip = new Label(e.summary());
+            chip.setMaxWidth(Double.MAX_VALUE);
+            chip.setWrapText(true);
+            chip.setStyle("-fx-background-color: " + toCss(c) + "; -fx-text-fill: white; "
+                    + "-fx-font-size: 9; -fx-padding: 1 4 1 4; -fx-background-radius: 4;");
+            chip.setOnMouseClicked(ev -> onEventSelected.accept(e));
+            box.getChildren().add(chip);
+        }
+        return box;
+    }
+
+    /**
+     * Paints the hour gridlines and the timed event blocks into {@code track}. Blocks are placed at
+     * their start time and sized by duration; overlapping events are pushed into side-by-side columns
+     * using the classic greedy column assignment.
+     */
+    private void addTimedBlocks(Pane track, List<CalendarEvent> timed, Map<String, Color> colors,
+                                double trackW, double trackH, int startHour, int endHour, double hourH) {
         // Hour gridlines.
         for (int h = startHour; h < endHour; h++) {
             Region line = new Region();
@@ -392,8 +517,6 @@ public final class CalendarGrid extends BorderPane {
             track.getChildren().add(line);
         }
 
-        // Timed event blocks, laid out like a real calendar: text top-aligned, overlapping events
-        // pushed into side-by-side columns using the classic greedy column assignment.
         List<int[]> minutes = new ArrayList<>();
         for (CalendarEvent e : timed) {
             int sm = e.start().getHour() * 60 + e.start().getMinute();
@@ -447,33 +570,6 @@ public final class CalendarGrid extends BorderPane {
             blk.setOnMouseClicked(ev -> onEventSelected.accept(e));
             track.getChildren().add(blk);
         }
-
-        // All-day events appear as a full-width block above the time grid.
-        if (!allDay.isEmpty()) {
-            VBox allDayBox = timedTrack(allDay, colors, trackW);
-            VBox wrap = new VBox(2, allDayBox, new HBox(timeCol, track));
-            return wrap;
-        }
-
-        day.getChildren().addAll(timeCol, track);
-        return day;
-    }
-
-    /** Builds a thin block listing all-day events for a full width. */
-    private VBox timedTrack(List<CalendarEvent> allDay, Map<String, Color> colors, double trackW) {
-        VBox box = new VBox(2);
-        box.setPrefWidth(trackW);
-        for (CalendarEvent e : allDay) {
-            Color c = colors.getOrDefault(e.source().name(), Color.web("#999"));
-            Label chip = new Label(e.summary());
-            chip.setMaxWidth(Double.MAX_VALUE);
-            chip.setWrapText(true);
-            chip.setStyle("-fx-background-color: " + toCss(c) + "; -fx-text-fill: white; "
-                    + "-fx-font-size: 9; -fx-padding: 1 4 1 4; -fx-background-radius: 4;");
-            chip.setOnMouseClicked(ev -> onEventSelected.accept(e));
-            box.getChildren().add(chip);
-        }
-        return box;
     }
 
     /** Updates the selection highlight and expand icons in place, without rebuilding the grid. */
@@ -484,6 +580,9 @@ public final class CalendarGrid extends BorderPane {
         }
         for (Cell cell : cells) {
             cell.refreshSelection();
+        }
+        if (weekMode) {
+            refreshWeekHeaders();
         }
     }
 
@@ -532,13 +631,23 @@ public final class CalendarGrid extends BorderPane {
         return at.compareTo(bt);
     }
 
+    /** Rebuilds the calendar according to the current view mode (month or week). */
     private void rebuild() {
         expandedDate = null;
         expandedPanel = null;
         expandOverlay.getChildren().clear();
         grid.getChildren().clear();
         cells.clear();
+        weekDayLabels.clear();
+        if (weekMode) {
+            buildWeek();
+        } else {
+            buildMonth();
+        }
+    }
 
+    /** Builds the six-week month grid with clickable day chips. */
+    private void buildMonth() {
         monthLabel.setText(month.format(MONTH_FMT));
         Map<LocalDate, List<CalendarEvent>> dayMap = byDay();
         Map<String, Color> colors = sourceColors();
@@ -576,6 +685,232 @@ public final class CalendarGrid extends BorderPane {
             cells.add(cell);
             grid.add(cell.node(), i % 7, 1 + i / 7);
         }
+
+        gridLayer.getChildren().setAll(grid, expandOverlay);
+    }
+
+    /** Builds the single-week view where each day is laid out like the day popup. */
+    private void buildWeek() {
+        monthLabel.setText(weekLabel());
+        Map<LocalDate, List<CalendarEvent>> dayMap = byDay();
+        Map<String, Color> colors = sourceColors();
+        ScrollPane week = buildWeekGrid(dayMap, colors);
+        gridLayer.getChildren().setAll(week);
+    }
+
+    /** A compact German range label for the currently displayed week. */
+    private String weekLabel() {
+        LocalDate end = weekStart.plusDays(6);
+        DateTimeFormatter shortFmt = DateTimeFormatter.ofPattern("d. MMM", Locale.GERMAN);
+        if (weekStart.getYear() == end.getYear()) {
+            return weekStart.format(shortFmt) + " – " + end.format(shortFmt) + " " + end.getYear();
+        }
+        DateTimeFormatter fullFmt = DateTimeFormatter.ofPattern("d. MMM yyyy", Locale.GERMAN);
+        return weekStart.format(fullFmt) + " – " + end.format(fullFmt);
+    }
+
+    /** Renders the week grid: a shared time gutter plus seven day columns. */
+    private ScrollPane buildWeekGrid(Map<LocalDate, List<CalendarEvent>> dayMap, Map<String, Color> colors) {
+        LocalDate[] days = new LocalDate[7];
+        for (int i = 0; i < 7; i++) {
+            days[i] = weekStart.plusDays(i);
+        }
+
+        // Collect timed events across the week to compute a shared hour range.
+        List<CalendarEvent> allTimed = new ArrayList<>();
+        for (LocalDate d : days) {
+            for (CalendarEvent e : dayMap.getOrDefault(d, List.of())) {
+                if (!(e.allDay() || e.start() == null)) {
+                    allTimed.add(e);
+                }
+            }
+        }
+        int[] range = hourRange(allTimed);
+        int startHour = range[0];
+        int endHour = range[1];
+        int rangeHours = endHour - startHour;
+
+        // Vertical scale so the week fills the available body height.
+        double bodyH = gridLayer.getHeight() > 0 ? gridLayer.getHeight() : WEEK_TARGET_H;
+        double available = bodyH - WEEK_HEADER_H - WEEK_ALLDAY_H - 8; // minus header row, all-day row, padding
+        double hourH = Math.max(8, Math.min(MAX_DAY_HOUR_H, available / rangeHours));
+        double trackH = rangeHours * hourH;
+
+        GridPane weekGrid = new GridPane();
+        weekGrid.setPadding(new Insets(4));
+        weekGrid.setHgap(2);
+        weekGrid.setVgap(2);
+
+        // Top row: day-header labels (with the selected day shown). Cell (0,0) holds a spacer for the gutter.
+        Label corner = new Label("");
+        corner.setMinWidth(WEEK_GUTTER_W);
+        corner.setMaxWidth(WEEK_GUTTER_W);
+        corner.setPrefWidth(WEEK_GUTTER_W);
+        weekGrid.add(corner, 0, 0);
+        GridPane.setHgrow(corner, Priority.NEVER);
+
+        String[] dayNames = {"Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"};
+        for (int col = 0; col < 7; col++) {
+            LocalDate d = days[col];
+            Label header = buildWeekHeader(d, dayNames[col]);
+            header.setMinWidth(WEEK_MIN_TRACK_W);
+            header.setPrefWidth(WEEK_MIN_TRACK_W);
+            header.setMaxWidth(Double.MAX_VALUE);
+            header.setOnMouseClicked(e -> {
+                selected = d;
+                onDaySelected.accept(d);
+                updateSelection();
+            });
+            weekGrid.add(header, col + 1, 0);
+            GridPane.setHgrow(header, Priority.ALWAYS);
+            weekDayLabels.add(header);
+        }
+
+        // Middle row: each day's all-day chips, aligned above its timed track.
+        for (int col = 0; col < 7; col++) {
+            VBox allDay = buildAllDayChips(days[col], dayMap.getOrDefault(days[col], List.of()), colors);
+            allDay.setMinWidth(WEEK_MIN_TRACK_W);
+            allDay.setPrefWidth(WEEK_MIN_TRACK_W);
+            allDay.setMaxWidth(Double.MAX_VALUE);
+            weekGrid.add(allDay, col + 1, 1);
+            GridPane.setHgrow(allDay, Priority.ALWAYS);
+        }
+        weekGrid.add(new Region(), 0, 1); // spacer under the gutter heading
+
+        // Body row: shared time gutter + one track per day.
+        Pane gutter = buildWeekGutter(startHour, endHour, hourH, trackH);
+        weekGrid.add(gutter, 0, 2);
+        GridPane.setHgrow(gutter, Priority.NEVER);
+
+        for (int col = 0; col < 7; col++) {
+            List<CalendarEvent> timed = dayMap.getOrDefault(days[col], List.of()).stream()
+                    .filter(e -> !(e.allDay() || e.start() == null))
+                    .collect(Collectors.toList());
+            Pane track = new Pane();
+            track.setMinWidth(WEEK_MIN_TRACK_W);
+            track.setPrefWidth(WEEK_MIN_TRACK_W);
+            track.setMaxWidth(Double.MAX_VALUE);
+            track.setMinHeight(trackH);
+            track.setPrefHeight(trackH);
+            track.setMaxHeight(trackH);
+            GridPane.setHgrow(track, Priority.ALWAYS);
+            addTimedBlocks(track, timed, colors, track.getPrefWidth(), trackH, startHour, endHour, hourH);
+            weekGrid.add(track, col + 1, 2);
+            GridPane.setHgrow(track, Priority.ALWAYS);
+        }
+
+        RowConstraints headerRow = new RowConstraints();
+        headerRow.setMinHeight(WEEK_HEADER_H);
+        headerRow.setPrefHeight(WEEK_HEADER_H);
+        weekGrid.getRowConstraints().add(headerRow);
+
+        RowConstraints allDayRow = new RowConstraints();
+        allDayRow.setMinHeight(WEEK_ALLDAY_H);
+        allDayRow.setPrefHeight(WEEK_ALLDAY_H);
+        weekGrid.getRowConstraints().add(allDayRow);
+
+        RowConstraints bodyRow = new RowConstraints();
+        bodyRow.setVgrow(Priority.ALWAYS);
+        bodyRow.setMinHeight(trackH);
+        bodyRow.setPrefHeight(trackH);
+        weekGrid.getRowConstraints().add(bodyRow);
+
+        ScrollPane scroll = new ScrollPane(weekGrid);
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scroll.setStyle("-fx-background-color: transparent; -fx-background-insets: 0;");
+        scroll.setPannable(true);
+        return scroll;
+    }
+
+    /** A bold day-header listing the weekday name and date number. */
+    private Label buildWeekHeader(LocalDate date, String dayName) {
+        Label header = new Label(dayName + "  " + date.getDayOfMonth());
+        header.setAlignment(Pos.CENTER);
+        header.setMaxWidth(Double.MAX_VALUE);
+        header.setStyle(weekHeaderStyle(date));
+        return header;
+    }
+
+    /** CSS for a week day-header, highlighting the selected day (and today). */
+    private String weekHeaderStyle(LocalDate date) {
+        boolean isToday = date.equals(LocalDate.now());
+        boolean isSelected = date.equals(selected);
+        String bg = isSelected ? WEEK_ACCENT : isToday ? "rgba(43,157,143,0.18)" : "transparent";
+        return "-fx-font-weight: bold; -fx-text-fill: " + (isSelected ? "#fff" : "#4b5563")
+                + "; -fx-background-color: " + bg + "; -fx-background-radius: 6; -fx-padding: 4;";
+    }
+
+    /** Re-applies the selected-day highlight to the week day-headers in place. */
+    private void refreshWeekHeaders() {
+        for (int i = 0; i < weekDayLabels.size() && i < 7; i++) {
+            weekDayLabels.get(i).setStyle(weekHeaderStyle(weekStart.plusDays(i)));
+        }
+    }
+
+    /** Builds the shared time gutter (hour labels) for the week body. */
+    private Pane buildWeekGutter(int startHour, int endHour, double hourH, double trackH) {
+        Pane pane = new Pane();
+        pane.setMinWidth(WEEK_GUTTER_W);
+        pane.setMaxWidth(WEEK_GUTTER_W);
+        pane.setPrefWidth(WEEK_GUTTER_W);
+        pane.setMinHeight(trackH);
+        pane.setPrefHeight(trackH);
+        pane.setMaxHeight(trackH);
+        for (int h = startHour; h < endHour; h++) {
+            Label label = new Label(String.format("%02d", h));
+            label.getStyleClass().add("hour-label");
+            label.setAlignment(Pos.CENTER_RIGHT);
+            label.setStyle("-fx-font-size: 10; -fx-text-fill: #6b7280;");
+            label.setPrefWidth(WEEK_GUTTER_W - 4);
+            label.setLayoutY((h - startHour) * hourH - 6);
+            pane.getChildren().add(label);
+        }
+        return pane;
+    }
+
+    /** The all-day chip stack for a single week day. */
+    private VBox buildAllDayChips(LocalDate date, List<CalendarEvent> dayEvents, Map<String, Color> colors) {
+        VBox box = new VBox(2);
+        box.setMaxWidth(Double.MAX_VALUE);
+        List<CalendarEvent> allDay = dayEvents.stream().filter(CalendarEvent::allDay).collect(Collectors.toList());
+        int shown = Math.min(allDay.size(), 2);
+        for (int i = 0; i < shown; i++) {
+            CalendarEvent e = allDay.get(i);
+            Label chip = new Label(e.summary() == null || e.summary().isBlank() ? "(ohne Titel)" : e.summary());
+            chip.setMaxWidth(Double.MAX_VALUE);
+            chip.setStyle("-fx-background-color: " + toCss(colors.getOrDefault(e.source().name(), Color.web("#999")))
+                    + "; -fx-background-radius: 4;"
+                    + " -fx-text-fill: white;"
+                    + " -fx-font-size: 9; -fx-padding: 1 4;");
+            box.getChildren().add(chip);
+        }
+        if (allDay.size() > shown) {
+            Label more = new Label("+" + (allDay.size() - shown));
+            more.setStyle("-fx-font-size: 9; -fx-text-fill: #6b7280;");
+            box.getChildren().add(more);
+        }
+        return box;
+    }
+
+    /** Clamps the peak hour range covering all timed events, matching the day-popup behaviour. */
+    private static int[] hourRange(List<CalendarEvent> timed) {
+        if (timed.isEmpty()) {
+            return new int[]{8, 18};
+        }
+        int min = 24;
+        int max = 0;
+        for (CalendarEvent e : timed) {
+            java.time.ZonedDateTime s = e.start();
+            java.time.ZonedDateTime en = e.end();
+            min = Math.min(min, s.getHour());
+            int eh = en == null ? s.getHour() + 1 : Math.max(en.getHour() + (en.getMinute() > 0 ? 1 : 0), s.getHour() + 1);
+            max = Math.max(max, eh);
+        }
+        min = Math.max(0, min);
+        max = Math.min(24, Math.max(max, min + 1));
+        return new int[]{min, max};
     }
 
     /** A single day cell. */

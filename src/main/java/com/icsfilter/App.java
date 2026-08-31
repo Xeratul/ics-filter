@@ -9,6 +9,7 @@ import com.icsfilter.ui.CalendarGrid;
 import com.icsfilter.ui.EventDetailPane;
 import com.icsfilter.ui.EventListPane;
 import com.icsfilter.ui.SourceTilesBar;
+import com.icsfilter.ui.UiPalette;
 import javafx.application.Application;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
@@ -101,6 +102,7 @@ public final class App extends Application {
             calendarGrid.setSelectedDate(e.startDate());
             detailPane.setEvent(e);
         });
+        eventList.setOnIgnoreRequest(e -> sourceTiles.ignoreTitle(e.source(), e.summary()));
 
         Scene scene = new Scene(root, 1180, 740);
         stage.setTitle("ICS Filter");
@@ -217,6 +219,7 @@ public final class App extends Application {
 
         List<CalendarEvent> visible = allEvents.stream()
                 .filter(e -> enabled.contains(e.source().name()))
+                .filter(e -> !isIgnored(e, sources))
                 .filter(App::matchesSourceFilter)
                 .toList();
 
@@ -246,6 +249,12 @@ public final class App extends Application {
             return true;
         }
         return e.summary().toLowerCase().contains(filter);
+    }
+
+    /** True when the event's source (resolved by name) lists its exact summary as ignored. */
+    private static boolean isIgnored(CalendarEvent e, List<CalendarSource> sources) {
+        CalendarSource current = UiPalette.currentSource(e.source(), sources);
+        return current != null && current.ignores(e.summary());
     }
 
     public static void main(String[] args) {

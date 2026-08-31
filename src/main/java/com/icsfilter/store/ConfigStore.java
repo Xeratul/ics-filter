@@ -78,7 +78,15 @@ public final class ConfigStore {
             if (name.isEmpty() && url.isEmpty()) {
                 continue;
             }
-            sources.add(new CalendarSource(name, url, filter, color));
+            List<String> ignoreTitles = new ArrayList<>();
+            int ignoreCount = intProp(p, "source." + i + ".ignore.count", 0);
+            for (int j = 0; j < ignoreCount; j++) {
+                String t = p.getProperty("source." + i + ".ignore." + j, "");
+                if (!t.isBlank()) {
+                    ignoreTitles.add(t);
+                }
+            }
+            sources.add(new CalendarSource(name, url, filter, color, ignoreTitles));
         }
 
         Set<String> enabled = new LinkedHashSet<>();
@@ -130,6 +138,11 @@ public final class ConfigStore {
                 p.setProperty("source." + i + ".url", s.url());
                 p.setProperty("source." + i + ".filter", s.filter());
                 p.setProperty("source." + i + ".color", s.color());
+                List<String> ignore = s.ignoreTitles();
+                p.setProperty("source." + i + ".ignore.count", String.valueOf(ignore.size()));
+                for (int j = 0; j < ignore.size(); j++) {
+                    p.setProperty("source." + i + ".ignore." + j, ignore.get(j));
+                }
             }
 
             List<String> enabled = new ArrayList<>(data.enabled());

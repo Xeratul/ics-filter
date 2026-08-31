@@ -15,10 +15,9 @@ Die fertig gebaute, eigenständig lauffähige Windows-EXE findest du unter den [
 
 ## Features
 
-- **Kalenderquellen verwalten:** Quellen (Name + URL) hinzufügen, entfernen, einzeln aktivieren/deaktivieren und neu laden.
+- **Kalenderquellen verwalten:** Quellen (Name + URL) als schaltbare Kacheln in der oberen Leiste; hinzufügen, bearbeiten, entfernen, einzeln aktivieren/deaktivieren und neu laden. Hinzufügen/Bearbeiten erfolgt über einen Dialog.
 - **ICS herunterladen & parsen:** Download über `HTTP/HTTPS`, Parsen mit `ical4j`.
 - **Wiederkehrende Termine:** Eigene RFC-5545-Expansion für `DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY` mit `INTERVAL`, `COUNT`, `UNTIL`, `BYDAY`, `BYMONTH`, `BYMONTHDAY`.
-- **Filterung:** Stichwort (Titel/Beschreibung/Ort), Datumsbereich sowie Kategorien.
 - **Darstellung:** Monatsraster mit farbigen Termin-Chips (Farbe je Quelle) und eine nach Startzeit sortierte Tabelle.
 
 ## Build
@@ -57,13 +56,11 @@ src/main/java/com/icsfilter
 ├── ical
 │   ├── Recurrence.java      # RFC-5545-Wiederholungs-Expansion
 │   └── EventLoader.java     # Download + Parse + Expansion
-├── filter
-│   └── EventFilter.java     # Stichwort-/Datums-/Kategorien-Filter
 └── ui
-    ├── SourceManagerPane.java
-    ├── FilterPane.java
+    ├── SourceTilesBar.java  # Quellen-Kacheln oben (Dialog für Hinzufügen/Bearbeiten)
     ├── CalendarGrid.java
     ├── EventListPane.java
+    ├── EventDetailPane.java
     └── UiPalette.java
 ```
 

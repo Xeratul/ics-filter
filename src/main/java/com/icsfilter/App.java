@@ -1,6 +1,5 @@
 package com.icsfilter;
 
-import com.icsfilter.filter.EventFilter;
 import com.icsfilter.ical.EventLoader;
 import com.icsfilter.model.CalendarEvent;
 import com.icsfilter.model.CalendarSource;
@@ -8,37 +7,35 @@ import com.icsfilter.store.ConfigStore;
 import com.icsfilter.ui.CalendarGrid;
 import com.icsfilter.ui.EventDetailPane;
 import com.icsfilter.ui.EventListPane;
-import com.icsfilter.ui.FilterPane;
-import com.icsfilter.ui.SourceManagerPane;
+import com.icsfilter.ui.SourceTilesBar;
 import javafx.application.Application;
 import javafx.concurrent.Task;
+import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
- * JavaFX application: manages ICS sources, loads and filters their events, and
- * shows them in a month calendar plus a sorted event list.
+ * JavaFX application: manages ICS sources, loads their events, and shows them
+ * in a month calendar plus a sorted event list.
  */
 public final class App extends Application {
 
     private final EventLoader loader = new EventLoader();
-    private final SourceManagerPane sourceManager = new SourceManagerPane();
-    private final FilterPane filterPane = new FilterPane();
+    private final SourceTilesBar sourceTiles = new SourceTilesBar();
     private final CalendarGrid calendarGrid = new CalendarGrid();
     private final EventListPane eventList = new EventListPane();
     private final EventDetailPane detailPane = new EventDetailPane();
@@ -57,36 +54,35 @@ public final class App extends Application {
         this.stage = stage;
         BorderPane root = new BorderPane();
 
-        VBox left = new VBox(6, sourceManager, new Separator(), filterPane);
-        ScrollPane leftScroll = new ScrollPane(left);
-        leftScroll.setFitToWidth(true);
-        leftScroll.setPrefWidth(340);
-
-        root.setLeft(leftScroll);
-
+        // Calendar area (with detail pane) on the left, event list on the right.
         calendar = new SplitPane(calendarGrid, detailPane);
         calendar.setOrientation(Orientation.VERTICAL);
         calendar.setDividerPositions(0.62);
         // Let the calendar area squeeze so the event list can be widened.
         calendar.setMinWidth(300);
 
-        // Calendar area (with detail pane) on the left, event list on the right;
-        // the divider between the two is draggable.
         center = new SplitPane(calendar, eventList);
         center.setOrientation(Orientation.HORIZONTAL);
         center.setDividerPositions(0.7);
         root.setCenter(center);
 
+        // Top: header (title + status + reload) and the source tiles bar.
         BorderPane header = new BorderPane();
         titleLabel.setStyle("-fx-font-size: 20; -fx-font-weight: bold;");
         header.setLeft(titleLabel);
         status.setStyle("-fx-text-fill: #666;");
-        header.setRight(status);
-        root.setTop(header);
+        Button reloadButton = new Button("Aktualisieren");
+        reloadButton.setStyle("-fx-background-color: #2a9d8f; -fx-text-fill: white;");
+        reloadButton.setOnAction(e -> reload());
+        HBox headerRight = new HBox(8, status, reloadButton);
+        headerRight.setAlignment(Pos.CENTER_RIGHT);
+        header.setRight(headerRight);
+        header.setPadding(new Insets(8));
 
-        sourceManager.setOnReload(this::reload);
-        sourceManager.setOnSourcesChanged(this::persistAndRefresh);
-        filterPane.setOnChange(this::persistAndRefresh);
+        VBox top = new VBox(header, sourceTiles);
+        root.setTop(top);
+
+        sourceTiles.setOnSourcesChanged(this::persistAndRefresh);
         calendarGrid.setOnDaySelected(d -> { });
         calendarGrid.setOnEventSelected(detailPane::setEvent);
         eventList.setOnEventSelected(e -> {
@@ -105,14 +101,10 @@ public final class App extends Application {
     /** Restores sources, enabled flags, filters and the window layout. */
     private void restore() {
         ConfigStore.Data data = store.load();
-        sourceManager.sources().setAll(data.sources());
-        sourceManager.enabled().clear();
-        sourceManager.enabled().addAll(data.enabled());
-        filterPane.keyword(data.keyword());
-        filterPane.from(data.from());
-        filterPane.to(data.to());
-        filterPane.selectCategories(data.categories());
-        sourceManager.refreshList();
+        sourceTiles.sources().setAll(data.sources());
+        sourceTiles.enabled().clear();
+        sourceTiles.enabled().addAll(data.enabled());
+        sourceTiles.refresh();
         restoreLayout(data.layout());
         refreshViews();
     }
@@ -145,12 +137,9 @@ public final class App extends Application {
     /** Persists the current state, then updates both views. */
     private void persistAndRefresh() {
         ConfigStore.Data data = new ConfigStore.Data(
-                new ArrayList<>(sourceManager.sources()),
-                new LinkedHashSet<>(sourceManager.enabled()),
-                filterPane.keyword(),
-                filterPane.from(),
-                filterPane.to(),
-                new LinkedHashSet<>(filterPane.selectedCategories()),
+                new ArrayList<>(sourceTiles.sources()),
+                new LinkedHashSet<>(sourceTiles.enabled()),
+                "", null, null, Set.of(),
                 currentLayout());
         store.save(data);
         refreshViews();
@@ -158,8 +147,8 @@ public final class App extends Application {
 
     /** Downloads and parses all enabled sources in a background task. */
     private void reload() {
-        List<CalendarSource> sources = new ArrayList<>(sourceManager.sources());
-        Set<String> enabled = new LinkedHashSet<>(sourceManager.enabled());
+        List<CalendarSource> sources = new ArrayList<>(sourceTiles.sources());
+        Set<String> enabled = new LinkedHashSet<>(sourceTiles.enabled());
         List<CalendarSource> toLoad = sources.stream()
                 .filter(s -> enabled.contains(s.name()))
                 .toList();
@@ -196,34 +185,17 @@ public final class App extends Application {
         t.start();
     }
 
-    /** Recomputes the filtered events and updates both views. */
+    /** Recomputes the visible events and updates both views. */
     private void refreshViews() {
-        EventFilter filter = buildFilter();
-        Set<String> enabled = sourceManager.enabled();
+        Set<String> enabled = sourceTiles.enabled();
 
-        List<CalendarEvent> available = allEvents.stream()
+        List<CalendarEvent> visible = allEvents.stream()
                 .filter(e -> enabled.contains(e.source().name()))
                 .filter(App::matchesSourceFilter)
                 .toList();
 
-        List<CalendarEvent> filtered = filter.apply(available);
-        calendarGrid.setEvents(filtered);
-        eventList.setEvents(filtered);
-
-        Set<String> categories = allEvents.stream()
-                .map(CalendarEvent::category)
-                .filter(c -> c != null && !c.isBlank())
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        filterPane.setCategories(categories);
-    }
-
-    private EventFilter buildFilter() {
-        EventFilter filter = new EventFilter();
-        filter.keyword(filterPane.keyword());
-        filter.from(filterPane.from());
-        filter.to(filterPane.to());
-        filter.categories().addAll(filterPane.selectedCategories());
-        return filter;
+        calendarGrid.setEvents(visible);
+        eventList.setEvents(visible);
     }
 
     /** Keeps only events whose summary contains their source's filter string. */

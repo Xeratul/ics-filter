@@ -11,6 +11,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 
@@ -93,7 +94,15 @@ public final class EventDetailPane extends ScrollPane {
         fromValue.setText(spanStart(event));
         toValue.setText(spanEnd(event));
         categoryValue.setText(emptyOr(event.category()));
-        sourceValue.setText(event.source() == null ? "—" : event.source().name());
+        if (event.source() == null) {
+            sourceValue.setText("—");
+            sourceValue.setStyle("");
+        } else {
+            sourceValue.setText(event.source().name());
+            int idx = 0;
+            Color color = UiPalette.resolveColor(event.source(), idx);
+            sourceValue.setStyle("-fx-text-fill: " + toCss(color) + ";");
+        }
         setFlow(locationValue, event.location());
         setFlow(descriptionValue, event.description());
         uidValue.setText(emptyOr(event.uid()));
@@ -175,5 +184,12 @@ public final class EventDetailPane extends ScrollPane {
         nameLabel.setStyle("-fx-text-fill: #666;");
         grid.add(nameLabel, 0, row);
         grid.add(value, 1, row);
+    }
+
+    private String toCss(Color color) {
+        return String.format("#%02x%02x%02x",
+                (int) Math.round(color.getRed() * 255),
+                (int) Math.round(color.getGreen() * 255),
+                (int) Math.round(color.getBlue() * 255));
     }
 }

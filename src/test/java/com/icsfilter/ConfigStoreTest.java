@@ -20,7 +20,7 @@ class ConfigStoreTest {
         ConfigStore store = new ConfigStore(file);
 
         List<CalendarSource> sources = List.of(
-                new CalendarSource("Arbeit", "https://example.com/work.ics", "Meeting"),
+                new CalendarSource("Arbeit", "https://example.com/work.ics", "Meeting", "#457b9d"),
                 new CalendarSource("Privat", "https://example.com/private.ics", ""));
         LinkedHashSet<String> enabled = new LinkedHashSet<>(List.of("Arbeit"));
         LocalDate from = LocalDate.of(2024, 1, 1);
@@ -34,8 +34,10 @@ class ConfigStoreTest {
         assertEquals("Arbeit", loaded.sources().get(0).name());
         assertEquals("https://example.com/work.ics", loaded.sources().get(0).url());
         assertEquals("Meeting", loaded.sources().get(0).filter());
+        assertEquals("#457b9d", loaded.sources().get(0).color());
         assertEquals("Privat", loaded.sources().get(1).name());
         assertEquals("", loaded.sources().get(1).filter());
+        assertEquals("", loaded.sources().get(1).color());
         assertEquals(enabled, loaded.enabled());
         assertEquals("Urlaub", loaded.keyword());
         assertEquals(from, loaded.from());

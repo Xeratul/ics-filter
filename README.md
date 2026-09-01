@@ -10,7 +10,8 @@ Die fertig gebaute, eigenständig lauffähige Windows-EXE findest du unter den [
 
 <img width="382" height="297" alt="image" src="https://github.com/user-attachments/assets/df52ac6e-ffab-4317-bd8b-ad56766feb59" />
 
-<img width="1920" height="1152" alt="image" src="https://github.com/user-attachments/assets/719b8639-1aee-421d-b6b9-007285ac74b0" />
+<img width="350" height="439" alt="644067464-719b8639-1aee-421d-b6b9-007285ac74b0" src="https://github.com/user-attachments/assets/8010f73d-ef11-4d0b-be16-e496b187bb9b" />
+
 
 
 
